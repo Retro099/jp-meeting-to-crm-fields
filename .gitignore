@@ -1,0 +1,21 @@
+# Environments
+.env
+venv/
+env/
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Docker
+.dockerignore
+
+# Streamlit
+.streamlit/
+
+# OS generated files
+.DS_Store
+Thumbs.db
