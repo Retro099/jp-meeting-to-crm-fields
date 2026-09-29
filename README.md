@@ -1,4 +1,3 @@
-```markdown
 # JP Meeting Note to CRM Fields Extractor
 
 An automated, production-ready NLP pipeline designed to extract structured CRM entities from unstructured Japanese business meeting notes. Built to demonstrate high-precision JSON extraction, this system handles complex Japanese business contexts—such as corporate abbreviations, hierarchical honorifics, and implicit formatting—using a 72B parameter instruction-tuned LLM.
@@ -47,7 +46,6 @@ The pipeline was evaluated against a 30-note labeled dataset (`data/gold_30.json
 ├── app.py                     # Streamlit frontend with API telemetry
 └── requirements.txt           # Minimal pinned runtime dependencies
 
-```
 
 ## 🚀 Quick Start (Local Deployment)
 
