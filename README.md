@@ -86,7 +86,3 @@ docker run --rm --name jp-crm-app -p 8501:8501 --env-file .env jp-crm-extractor
 ### 4. Access the UI
 
 Navigate to `http://localhost:8501` in your web browser. Paste a Japanese meeting note into the input panel and execute the pipeline to view the structured CRM output, execution latency, and token economy metrics.
-
-```
-
-```
