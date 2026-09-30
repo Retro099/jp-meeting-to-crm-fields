@@ -45,7 +45,7 @@ The pipeline was evaluated against a 30-note labeled dataset (`data/gold_30.json
 ├── README.md                  # Project documentation
 ├── app.py                     # Streamlit frontend with API telemetry
 └── requirements.txt           # Minimal pinned runtime dependencies
-
+```
 
 ## 🚀 Quick Start (Local Deployment)
 
