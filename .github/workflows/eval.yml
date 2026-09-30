@@ -1,0 +1,59 @@
+name: Eval (manual, uses API credits)
+
+# Manual only: runs the paid eval (30 extraction + 60 judge calls) with the repo secret AICREDITS_API_KEY.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval
+  cancel-in-progress: false
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      MAX_API_CALLS: "100"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Budget guard (planned API calls)
+        run: |
+          notes=$(grep -c . data/gold_30.jsonl)
+          planned=$((notes * 3))   # 1 extraction + 2 judge calls per note
+          echo "Planned API calls: $planned (limit $MAX_API_CALLS)"
+          if [ "$planned" -gt "$MAX_API_CALLS" ]; then echo "Over budget, stopping."; exit 1; fi
+      - name: Run extraction eval (temperature=0)
+        env:
+          AICREDITS_API_KEY: ${{ secrets.AICREDITS_API_KEY }}
+        run: python eval/run_eval.py
+      - name: Run LLM judge
+        env:
+          AICREDITS_API_KEY: ${{ secrets.AICREDITS_API_KEY }}
+        run: python eval/judge.py
+      - name: Build report (no API calls)
+        run: python eval/report.py
+      - name: Check outputs contain no secret
+        env:
+          AICREDITS_API_KEY: ${{ secrets.AICREDITS_API_KEY }}
+        run: |
+          if grep -rqF -- "$AICREDITS_API_KEY" eval/; then echo "Secret found in outputs, not uploading."; exit 1; fi
+          echo "No secret in outputs."
+      - uses: actions/upload-artifact@v7
+        with:
+          name: eval-outputs
+          path: |
+            eval/predictions_t0.jsonl
+            eval/run_meta_t0.json
+            eval/judge_results.jsonl
+            eval/judge_meta.json
+            eval/results.md
+          if-no-files-found: error
