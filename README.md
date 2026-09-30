@@ -1,3 +1,5 @@
+[日本語版はこちら](README.ja.md)
+
 # JP Meeting Note to CRM Fields Extractor
 
 日本語の商談メモからCRM項目（相手・会社名・期限・次アクション・リスク）をLLMで抽出し、正解データで精度を評価するプロジェクトです。
@@ -75,6 +77,7 @@ Per-field accuracy for iteration 3:
 ├── .gitignore                 # Enforces security exclusions (.env, pycache)
 ├── Dockerfile                 # Container definition (Exposes port 8501)
 ├── README.md                  # Project documentation
+├── README.ja.md               # Japanese README (日本語版)
 ├── app.py                     # Streamlit frontend with API telemetry and demo limits
 ├── prompts.py                 # Shared system prompt, model name and settings (used by app + eval)
 └── requirements.txt           # Minimal pinned runtime dependencies
