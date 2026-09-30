@@ -1,5 +1,7 @@
 # JP Meeting Note to CRM Fields Extractor
 
+日本語の商談メモからCRM項目（相手・会社名・期限・次アクション・リスク）をLLMで抽出し、正解データで精度を評価するプロジェクトです。
+
 An automated, production-ready NLP pipeline designed to extract structured CRM entities from unstructured Japanese business meeting notes. Built to demonstrate high-precision JSON extraction, this system handles complex Japanese business contexts—such as corporate abbreviations, hierarchical honorifics, and implicit formatting—using a 72B parameter instruction-tuned LLM.
 
 The project features a containerized Streamlit frontend complete with real-time performance telemetry, demonstrating end-to-end MLOps and Japanese NLP capabilities suitable for enterprise environments.
@@ -20,6 +22,18 @@ Extracting data from Japanese business notes requires handling specific linguist
 
 ## 📊 Evaluation Metrics
 The pipeline was evaluated against a 30-note labeled dataset (`data/gold_30.jsonl`) using a strict exact-string match algorithm. Over three prompt iterations, the system achieved the following baseline:
+
+### Results
+
+Overall exact-match accuracy on 150 fields (30 notes × 5 fields), by prompt iteration:
+
+| Prompt iteration | Exact match (150 fields) |
+| :--- | :--- |
+| Iteration 1 | 28.7% |
+| Iteration 2 | 53.3% |
+| Iteration 3 (current) | **56.0%** (84/150) |
+
+Per-field accuracy for iteration 3:
 
 | Field (抽出項目) | Accuracy | Correct/Total | Notes |
 | :--- | :--- | :--- | :--- |
