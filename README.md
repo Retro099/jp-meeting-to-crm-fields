@@ -60,14 +60,14 @@ Per-field accuracy for iteration 3:
 
 ![Streamlit app: Japanese meeting note → CRM fields](docs/screenshot.png)
 
-*Streamlit app on a fictional sample note, showing latency/token telemetry and the raw JSON output.*
+*The live deployed app (Streamlit Community Cloud) on a fictional sample note, showing latency/token telemetry, the demo-limit counter, and the raw JSON output.*
 
 ## 📂 Repository Structure
 ```text
 ├── data/
 │   └── gold_30.jsonl          # 30-note labeled evaluation dataset
 ├── docs/
-│   └── screenshot.png         # Streamlit app screenshot (fictional sample note)
+│   └── screenshot.png         # Live app screenshot (fictional sample note)
 ├── eval/
 │   ├── results.md             # Accuracy metrics and extraction failure logs
 │   └── run_eval.py            # Automated evaluation execution script
