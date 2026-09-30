@@ -2,6 +2,9 @@
 
 日本語の商談メモからCRM項目（相手・会社名・期限・次アクション・リスク）をLLMで抽出し、正解データで精度を評価するプロジェクトです。
 
+**▶ Live demo: https://retro-jp-meeting-to-crm-fields.streamlit.app/**<br>
+*It may be asleep if no one has used it recently. Click the wake-up button and wait a moment. Demo limits apply (see below).*
+
 LLM extraction of CRM fields from unstructured Japanese business meeting notes, with a fixed 30-note exact-match evaluation. The prompt is designed for common patterns in Japanese business notes—corporate abbreviations, honorifics, and informal formatting—and uses Qwen 2.5 72B Instruct to return the fields as JSON.
 
 The project includes a Streamlit frontend (runnable in Docker) that shows the extracted fields, request latency, and token usage for each run.
