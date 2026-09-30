@@ -1,8 +1,13 @@
 import json
 import os
+import sys
 import time
 from openai import OpenAI
 from dotenv import load_dotenv
+
+# Make the repo root importable so the shared prompt is used (python eval/run_eval.py)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from prompts import API_BASE_URL, MODEL_NAME, SYSTEM_PROMPT, TEMPERATURE  # noqa: E402
 
 # Load environment variables
 load_dotenv()
@@ -10,37 +15,19 @@ load_dotenv()
 # Initialize client securely
 client = OpenAI(
     api_key=os.getenv("AICREDITS_API_KEY"),
-    base_url="https://api.aicredits.in/v1"
+    base_url=API_BASE_URL
 )
-
-SYSTEM_PROMPT = """あなたは優秀なCRMデータ抽出APIです。
-ユーザーが入力する商談メモから、以下の5つのフィールドを抽出し、厳密なJSONフォーマットのみで出力してください。
-Markdownブロック（```json）や余計な解説は一切含めないでください。
-
-【抽出ルール】
-1. 会社名: 「(株)」「(有)」などの略称は、必ず「株式会社」「有限会社」など正式名称に変換すること。ただし、元のテキストの前後位置（前株・後株）は必ず維持し、元のテキストに法人格がない場合は勝手に「株式会社」を補完しないこと。
-2. 相手: 「様」「さん」「社長」「部長」などの敬称や役職名はすべて除外し、氏名のみを抽出すること。複数人の場合は「、」で区切ること。
-3. 次アクション: 文末は必ず体言止め（名詞形）で簡潔にまとめること（例：「〜を送付する」ではなく「〜の送付」）。助詞の「の」の有無など、簡潔な名詞句を心がけること。
-4. 期限: メモに記載されている期限をそのまま抽出すること。ただし、末尾の「まで」は必ず削除すること（例：「今月末まで」→「今月末」）。
-5. リスク: 案件における懸念点やリスクを、簡潔な要約文として抽出すること。
-
-【抽出項目】
-- 会社名
-- 相手
-- 次アクション
-- 期限
-- リスク
-"""
 
 def call_extractor(text):
     try:
         response = client.chat.completions.create(
-            model="qwen/qwen-2.5-72b-instruct", 
+            model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"入力メモ:\n{text}"}
             ],
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
+            temperature=TEMPERATURE,
         )
         content = response.choices[0].message.content
         return json.loads(content)

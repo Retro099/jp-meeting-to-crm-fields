@@ -6,6 +6,11 @@ LLM extraction of CRM fields from unstructured Japanese business meeting notes, 
 
 The project includes a Streamlit frontend (runnable in Docker) that shows the extracted fields, request latency, and token usage for each run.
 
+## 🎯 Why / Who it's for
+Sales reps write quick, messy notes after a customer call, and then have to re-type the key facts into the CRM by hand. With this tool, a rep pastes the Japanese meeting note, gets the five CRM fields (相手・会社名・期限・次アクション・リスク) back as JSON, reviews and corrects them, and then saves them to the CRM. The aim is to cut manual CRM data entry; the time saved has not been measured.
+
+**Demo limits:** to protect the API budget, the hosted demo allows at most 2,000 characters per note, 5 runs per visitor session, and a shared daily cap on total runs.
+
 ## 🏗️ Architecture & Tech Stack
 * **LLM Engine:** Qwen 2.5 72B Instruct
 * **API Gateway:** AICredits (OpenAI SDK compatible, enabling cost-effective and region-unlocked model access)
@@ -22,6 +27,10 @@ Extracting data from Japanese business notes requires handling specific linguist
 
 ## 📊 Evaluation Metrics
 The pipeline was evaluated against a 30-note labeled dataset (`data/gold_30.jsonl`) using a strict exact-string match algorithm. Over three prompt iterations, the system achieved the following baseline:
+
+*Data note:* the 30 evaluation notes (`data/gold_30.jsonl`) are synthetic, LLM-generated Japanese business meeting notes with gold labels prepared for this eval; no real customer or interview data is used.
+
+*Temperature note:* these results were measured before `temperature=0` was set in the API calls (the model's default temperature was used). The numbers may shift slightly if the eval is re-run.
 
 ### Results
 
@@ -63,7 +72,8 @@ Per-field accuracy for iteration 3:
 ├── .gitignore                 # Enforces security exclusions (.env, pycache)
 ├── Dockerfile                 # Container definition (Exposes port 8501)
 ├── README.md                  # Project documentation
-├── app.py                     # Streamlit frontend with API telemetry
+├── app.py                     # Streamlit frontend with API telemetry and demo limits
+├── prompts.py                 # Shared system prompt, model name and settings (used by app + eval)
 └── requirements.txt           # Minimal pinned runtime dependencies
 ```
 
@@ -106,3 +116,15 @@ docker run --rm --name jp-crm-app -p 8501:8501 --env-file .env jp-crm-extractor
 ### 4. Access the UI
 
 Navigate to `http://localhost:8501` in your web browser. Paste a Japanese meeting note into the input panel and execute the pipeline to view the structured CRM output, execution latency, and token economy metrics.
+
+## ☁️ Deploy on Streamlit Community Cloud
+
+1. At [share.streamlit.io](https://share.streamlit.io), click **Create app** and pick this repository, branch `main`, and main file path `app.py`.
+2. Open **Advanced settings**, choose **Python 3.11** (the same version as the Docker image), and paste this into **Secrets**:
+
+   ```toml
+   AICREDITS_API_KEY = "your_actual_key_here"
+   ```
+3. Click **Deploy**. The app reads the key from the environment first and falls back to `st.secrets`. If the key is missing, the app shows setup instructions instead of the UI.
+
+Community Cloud installs the pinned packages from `requirements.txt`. Apps with no traffic for 12 hours go to sleep; any visitor can wake one up from the sleep page.

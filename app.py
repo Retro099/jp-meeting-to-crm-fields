@@ -1,47 +1,94 @@
-import streamlit as st
+import datetime
 import json
-import time
 import os
-from openai import OpenAI
+import threading
+import time
+
+import streamlit as st
 from dotenv import load_dotenv
+from openai import OpenAI
+
+from prompts import API_BASE_URL, MODEL_NAME, SYSTEM_PROMPT, TEMPERATURE
 
 load_dotenv()
 
-# Initialize the client securely using os.getenv
-client = OpenAI(
-    api_key=os.getenv("AICREDITS_API_KEY"),
-    base_url="https://api.aicredits.in/v1"
-)
+# Demo limits (protect the API budget on the public demo)
+MAX_CHARS = 2000            # max characters per note
+MAX_RUNS_PER_SESSION = 5    # max extractions per visitor session
+DAILY_CAP = 50              # max extractions per day, shared by all visitors (UTC date)
 
-SYSTEM_PROMPT = """あなたは優秀なCRMデータ抽出APIです。
-ユーザーが入力する商談メモから、以下の5つのフィールドを抽出し、厳密なJSONフォーマットのみで出力してください。
-Markdownブロック（```json）や余計な解説は一切含めないでください。
+# --- UI Layout & Styling ---
+st.set_page_config(page_title="CRM Data Extractor", page_icon="🏢", layout="wide")
 
-【抽出ルール】
-1. 会社名: 「(株)」「(有)」などの略称は、必ず「株式会社」「有限会社」など正式名称に変換すること。ただし、元のテキストの前後位置（前株・後株）は必ず維持し、元のテキストに法人格がない場合は勝手に「株式会社」を補完しないこと。
-2. 相手: 「様」「さん」「社長」「部長」などの敬称や役職名はすべて除外し、氏名のみを抽出すること。複数人の場合は「、」で区切ること。
-3. 次アクション: 文末は必ず体言止め（名詞形）で簡潔にまとめること（例：「〜を送付する」ではなく「〜の送付」）。助詞の「の」の有無など、簡潔な名詞句を心がけること。
-4. 期限: メモに記載されている期限をそのまま抽出すること。ただし、末尾の「まで」は必ず削除すること（例：「今月末まで」→「今月末」）。
-5. リスク: 案件における懸念点やリスクを、簡潔な要約文として抽出すること。
 
-【抽出項目】
-- 会社名
-- 相手
-- 次アクション
-- 期限
-- リスク
-"""
+def get_api_key():
+    """Read the key from the environment (.env / Docker), then from Streamlit secrets."""
+    key = os.getenv("AICREDITS_API_KEY")
+    if key:
+        return key
+    try:
+        return st.secrets["AICREDITS_API_KEY"]
+    except Exception:
+        return None
+
+
+api_key = get_api_key()
+if not api_key:
+    st.error(
+        "**AICREDITS_API_KEY is not set.**\n\n"
+        "- Local: add `AICREDITS_API_KEY=\"your_key\"` to a `.env` file in the repo root.\n"
+        "- Docker: run with `--env-file .env`.\n"
+        "- Streamlit Community Cloud: add `AICREDITS_API_KEY = \"your_key\"` under App settings → Secrets."
+    )
+    st.stop()
+
+client = OpenAI(api_key=api_key, base_url=API_BASE_URL)
+
+
+@st.cache_resource
+def _daily_usage():
+    """Run counts per UTC date, shared across all sessions of this app process."""
+    return {"lock": threading.Lock(), "counts": {}}
+
+
+def _today():
+    return datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+
+
+def daily_runs_used():
+    return _daily_usage()["counts"].get(_today(), 0)
+
+
+def try_reserve_run():
+    """Count one run against the session and daily caps. Returns an error message, or None if allowed."""
+    if st.session_state.runs_used >= MAX_RUNS_PER_SESSION:
+        return (f"You've used all {MAX_RUNS_PER_SESSION} demo runs for this session. "
+                "Thanks for trying it! To run more, clone the repo and use your own API key.")
+    usage = _daily_usage()
+    with usage["lock"]:
+        today = _today()
+        if usage["counts"].get(today, 0) >= DAILY_CAP:
+            return "The shared daily demo limit has been reached. Please try again tomorrow (UTC)."
+        usage["counts"] = {today: usage["counts"].get(today, 0) + 1}
+    st.session_state.runs_used += 1
+    return None
+
+
+if "runs_used" not in st.session_state:
+    st.session_state.runs_used = 0
+
 
 def extract_crm_data(text):
     start_time = time.time()
     try:
         response = client.chat.completions.create(
-            model="qwen/qwen-2.5-72b-instruct",
+            model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"入力メモ:\n{text}"}
             ],
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
+            temperature=TEMPERATURE,
         )
         end_time = time.time()
         
@@ -59,9 +106,6 @@ def extract_crm_data(text):
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
-
-# --- UI Layout & Styling ---
-st.set_page_config(page_title="CRM Data Extractor", page_icon="🏢", layout="wide")
 
 # Sidebar: System Telemetry
 with st.sidebar:
@@ -81,8 +125,10 @@ with col1:
     note_input = st.text_area(
         "Paste Japanese meeting note here:", 
         height=250, 
-        placeholder="【商談メモ】 10/28 (株)グローバルテック 営業部 佐藤部長、田中さん。..."
+        placeholder="【商談メモ】 10/28 (株)グローバルテック 営業部 佐藤部長、田中さん。...",
+        max_chars=MAX_CHARS,
     )
+    usage_caption = st.empty()  # filled in at the end, after this run is counted
     extract_btn = st.button("Run Extraction Pipeline", type="primary", use_container_width=True)
 
 with col2:
@@ -91,6 +137,10 @@ with col2:
     if extract_btn:
         if not note_input.strip():
             st.warning("Please enter a meeting note first.")
+        elif len(note_input) > MAX_CHARS:
+            st.error(f"The note is too long ({len(note_input)} characters). The limit is {MAX_CHARS} characters.")
+        elif (limit_error := try_reserve_run()) is not None:
+            st.warning(limit_error)
         else:
             with st.spinner("Processing via Qwen 72B..."):
                 result = extract_crm_data(note_input)
@@ -127,3 +177,8 @@ with col2:
                     # Developer View for the raw JSON payload
                     with st.expander("🛠️ Developer View (Raw JSON Payload)"):
                         st.json(data)
+
+usage_caption.caption(
+    f"{len(note_input)}/{MAX_CHARS} characters · "
+    f"{MAX_RUNS_PER_SESSION - st.session_state.runs_used}/{MAX_RUNS_PER_SESSION} demo runs left this session"
+)
