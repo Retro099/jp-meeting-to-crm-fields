@@ -2,9 +2,9 @@
 
 日本語の商談メモからCRM項目（相手・会社名・期限・次アクション・リスク）をLLMで抽出し、正解データで精度を評価するプロジェクトです。
 
-An automated, production-ready NLP pipeline designed to extract structured CRM entities from unstructured Japanese business meeting notes. Built to demonstrate high-precision JSON extraction, this system handles complex Japanese business contexts—such as corporate abbreviations, hierarchical honorifics, and implicit formatting—using a 72B parameter instruction-tuned LLM.
+LLM extraction of CRM fields from unstructured Japanese business meeting notes, with a fixed 30-note exact-match evaluation. The prompt is designed for common patterns in Japanese business notes—corporate abbreviations, honorifics, and informal formatting—and uses Qwen 2.5 72B Instruct to return the fields as JSON.
 
-The project features a containerized Streamlit frontend complete with real-time performance telemetry, demonstrating end-to-end MLOps and Japanese NLP capabilities suitable for enterprise environments.
+The project includes a Streamlit frontend (runnable in Docker) that shows the extracted fields, request latency, and token usage for each run.
 
 ## 🏗️ Architecture & Tech Stack
 * **LLM Engine:** Qwen 2.5 72B Instruct
@@ -39,17 +39,23 @@ Per-field accuracy for iteration 3:
 | :--- | :--- | :--- | :--- |
 | **Contact (相手)** | 100.0% | 30/30 | Perfectly stripped all titles and departments. |
 | **Company (会社名)** | 93.3% | 28/30 | Handled implicit and explicit corporate entity formats. |
-| **Deadline (期限)** | 70.0% | 21/30 | High precision on temporal extraction. |
+| **Deadline (期限)** | 70.0% | 21/30 | Misses are small wording differences (e.g. `明日` vs `明日中`); see `eval/results.md`. |
 | **Action (次アクション)**| 13.3% | 4/30 | *Subject to exact-match metric limitations.* |
 | **Risk (リスク)** | 3.3% | 1/30 | *Subject to exact-match metric limitations.* |
 | **Overall Baseline** | **56.0%** | **84/150** | |
 
-*Note on Generative Fields: The exact-match accuracy for `次アクション` and `リスク` reflects the limitations of using Python string equality (`==`) on generative natural language summaries. Semantic analysis confirms the model successfully extracts the correct underlying actions and risks, indicating that production CI/CD pipelines should utilize embedding cosine similarity or LLM-as-a-judge for evaluating these specific subjective fields.*
+*Note on generative fields: exact match (Python `==`) is strict for free-text fields like `次アクション` and `リスク`. Many misses in `eval/results.md` are paraphrases of the expected answer, but some leave out part of it (e.g. a second risk). Semantic scoring (embedding similarity or LLM-as-a-judge) is planned but not done yet, so these numbers are exact-match only.*
+
+![Streamlit app: Japanese meeting note → CRM fields](docs/screenshot.png)
+
+*Streamlit app on a fictional sample note, showing latency/token telemetry and the raw JSON output.*
 
 ## 📂 Repository Structure
 ```text
 ├── data/
 │   └── gold_30.jsonl          # 30-note labeled evaluation dataset
+├── docs/
+│   └── screenshot.png         # Streamlit app screenshot (fictional sample note)
 ├── eval/
 │   ├── results.md             # Accuracy metrics and extraction failure logs
 │   └── run_eval.py            # Automated evaluation execution script
