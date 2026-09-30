@@ -1,0 +1,12 @@
+{
+  "run_date_ist": "2026-09-30T16:11+05:30",
+  "model": "qwen/qwen-2.5-72b-instruct",
+  "temperature": 0,
+  "notes": 30,
+  "api_calls": 30,
+  "failed_calls": 0,
+  "prompt_tokens": 14382,
+  "completion_tokens": 2133,
+  "total_tokens": 16515,
+  "avg_latency_s": 4.6
+}

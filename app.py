@@ -1,21 +1,18 @@
 import datetime
-import json
 import os
 import threading
-import time
 
 import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from prompts import API_BASE_URL, MODEL_NAME, SYSTEM_PROMPT, TEMPERATURE
+from demo_limits import DAILY_CAP, MAX_CHARS, MAX_RUNS_PER_SESSION, reserve_run, validate_note
+from extractor import extract_crm_data
+from prompts import API_BASE_URL
 
 load_dotenv()
 
-# Demo limits (protect the API budget on the public demo)
-MAX_CHARS = 2000            # max characters per note
-MAX_RUNS_PER_SESSION = 5    # max extractions per visitor session
-DAILY_CAP = 50              # max extractions per day, shared by all visitors (UTC date)
+# Demo limits (MAX_CHARS, MAX_RUNS_PER_SESSION, DAILY_CAP) live in demo_limits.py
 
 # --- UI Layout & Styling ---
 st.set_page_config(page_title="CRM Data Extractor", page_icon="🏢", layout="wide")
@@ -61,15 +58,13 @@ def daily_runs_used():
 
 def try_reserve_run():
     """Count one run against the session and daily caps. Returns an error message, or None if allowed."""
-    if st.session_state.runs_used >= MAX_RUNS_PER_SESSION:
-        return (f"You've used all {MAX_RUNS_PER_SESSION} demo runs for this session. "
-                "Thanks for trying it! To run more, clone the repo and use your own API key.")
     usage = _daily_usage()
     with usage["lock"]:
-        today = _today()
-        if usage["counts"].get(today, 0) >= DAILY_CAP:
-            return "The shared daily demo limit has been reached. Please try again tomorrow (UTC)."
-        usage["counts"] = {today: usage["counts"].get(today, 0) + 1}
+        allowed, message, new_counts = reserve_run(
+            st.session_state.runs_used, usage["counts"], _today(), MAX_RUNS_PER_SESSION, DAILY_CAP)
+        if not allowed:
+            return message
+        usage["counts"] = new_counts
     st.session_state.runs_used += 1
     return None
 
@@ -77,35 +72,6 @@ def try_reserve_run():
 if "runs_used" not in st.session_state:
     st.session_state.runs_used = 0
 
-
-def extract_crm_data(text):
-    start_time = time.time()
-    try:
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"入力メモ:\n{text}"}
-            ],
-            response_format={"type": "json_object"},
-            temperature=TEMPERATURE,
-        )
-        end_time = time.time()
-        
-        # Extract metadata
-        latency = round(end_time - start_time, 2)
-        usage = response.usage
-        
-        return {
-            "success": True,
-            "data": json.loads(response.choices[0].message.content),
-            "latency": latency,
-            "prompt_tokens": usage.prompt_tokens,
-            "completion_tokens": usage.completion_tokens,
-            "total_tokens": usage.total_tokens
-        }
-    except Exception as e:
-        return {"success": False, "error": str(e)}
 
 # Sidebar: System Telemetry
 with st.sidebar:
@@ -135,15 +101,15 @@ with col2:
     st.subheader("2. Extraction Results")
     
     if extract_btn:
-        if not note_input.strip():
-            st.warning("Please enter a meeting note first.")
-        elif len(note_input) > MAX_CHARS:
-            st.error(f"The note is too long ({len(note_input)} characters). The limit is {MAX_CHARS} characters.")
+        note_problem = validate_note(note_input, MAX_CHARS)
+        if note_problem is not None:
+            level, message = note_problem
+            (st.warning if level == "warning" else st.error)(message)
         elif (limit_error := try_reserve_run()) is not None:
             st.warning(limit_error)
         else:
             with st.spinner("Processing via Qwen 72B..."):
-                result = extract_crm_data(note_input)
+                result = extract_crm_data(client, note_input)
                 
                 if not result["success"]:
                     st.error(f"Extraction failed: {result['error']}")

@@ -1,0 +1,32 @@
+{
+  "model": "qwen/qwen-2.5-72b-instruct",
+  "temperature": 0,
+  "api_calls": 60,
+  "failed_calls": 0,
+  "prompt_tokens": 34532,
+  "completion_tokens": 1893,
+  "total_tokens": 36425,
+  "avg_latency_s": 2.58,
+  "summary": {
+    "次アクション": {
+      "n": 30,
+      "counts": {
+        "match": 25,
+        "partial": 5,
+        "miss": 0
+      },
+      "semantic_score": 0.9166666666666666,
+      "strict_match_rate": 0.8333333333333334
+    },
+    "リスク": {
+      "n": 30,
+      "counts": {
+        "match": 15,
+        "partial": 15,
+        "miss": 0
+      },
+      "semantic_score": 0.75,
+      "strict_match_rate": 0.5
+    }
+  }
+}

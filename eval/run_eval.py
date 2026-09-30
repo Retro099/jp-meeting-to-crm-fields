@@ -1,111 +1,81 @@
+"""Run the extraction eval on data/gold_30.jsonl and save predictions + run metadata.
+
+Usage (key via the environment only):  python eval/run_eval.py
+Writes eval/predictions_t0.jsonl and eval/run_meta_t0.json, then run eval/report.py.
+"""
+
+import datetime
 import json
 import os
 import sys
 import time
-from openai import OpenAI
+
 from dotenv import load_dotenv
+from openai import OpenAI
 
-# Make the repo root importable so the shared prompt is used (python eval/run_eval.py)
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-from prompts import API_BASE_URL, MODEL_NAME, SYSTEM_PROMPT, TEMPERATURE  # noqa: E402
+# Make the repo root importable so the shared prompt / extractor are used (python eval/run_eval.py)
+EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(EVAL_DIR, ".."))
+from extractor import extract_crm_data  # noqa: E402
+from prompts import API_BASE_URL, MODEL_NAME, TEMPERATURE  # noqa: E402
 
-# Load environment variables
-load_dotenv()
+DATA_PATH = os.path.join(EVAL_DIR, "..", "data", "gold_30.jsonl")
+PRED_PATH = os.path.join(EVAL_DIR, "predictions_t0.jsonl")
+META_PATH = os.path.join(EVAL_DIR, "run_meta_t0.json")
 
-# Initialize client securely
-client = OpenAI(
-    api_key=os.getenv("AICREDITS_API_KEY"),
-    base_url=API_BASE_URL
-)
 
-def call_extractor(text):
-    try:
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"入力メモ:\n{text}"}
-            ],
-            response_format={"type": "json_object"},
-            temperature=TEMPERATURE,
-        )
-        content = response.choices[0].message.content
-        return json.loads(content)
-    except Exception as e:
-        print(f"Extraction error: {e}")
-        return {}
+def load_gold(path=DATA_PATH):
+    with open(path, encoding="utf-8") as f:
+        return [json.loads(line) for line in f if line.strip()]
+
 
 def run_eval():
-    # Set up relative paths for your directory structure
-    base_dir = os.path.dirname(__file__)
-    data_path = os.path.join(base_dir, "..", "data", "gold_30.jsonl")
-    results_path = os.path.join(base_dir, "results.md")
-    
-    fields = ["会社名", "相手", "次アクション", "期限", "リスク"]
-    scores = {f: {"correct": 0, "total": 0} for f in fields}
-    errors = []
+    load_dotenv()
+    client = OpenAI(api_key=os.getenv("AICREDITS_API_KEY"), base_url=API_BASE_URL)
+    records = load_gold()
+    print(f"Starting evaluation of {len(records)} notes using {MODEL_NAME} (temperature={TEMPERATURE})...")
 
-    with open(data_path, "r", encoding="utf-8") as f:
-        lines = f.readlines()
+    rows = []
+    for idx, record in enumerate(records, start=1):
+        print(f"Processing note {idx}/{len(records)}...")
+        result = extract_crm_data(client, record["input"])
+        if not result["success"]:
+            print(f"  extraction error: {result['error']}")
+        rows.append({
+            "note_id": idx,
+            "input": record["input"],
+            "expected": record["expected"],
+            "predicted": result.get("data", {}) if result["success"] else {},
+            "success": result["success"],
+            "error": result.get("error"),
+            "latency_s": result.get("latency"),
+            "prompt_tokens": result.get("prompt_tokens"),
+            "completion_tokens": result.get("completion_tokens"),
+            "total_tokens": result.get("total_tokens"),
+        })
+        time.sleep(1)
 
-    print(f"Starting evaluation of {len(lines)} notes using qwen-2.5-72b-instruct (via AICredits)...")
-    
-    for idx, line in enumerate(lines):
-        record = json.loads(line.strip())
-        print(f"Processing note {idx + 1}/30...")
-        
-        extracted = call_extractor(record["input"])
-        expected = record["expected"]
-        
-        note_errors = {}
-        for field in fields:
-            gold_val = expected.get(field, "")
-            ext_val = extracted.get(field, "")
-            
-            scores[field]["total"] += 1
-            if str(gold_val).strip() == str(ext_val).strip():
-                scores[field]["correct"] += 1
-            else:
-                note_errors[field] = {"expected": gold_val, "extracted": ext_val}
-        
-        if note_errors:
-            errors.append({
-                "note_id": idx + 1,
-                "input": record["input"],
-                "errors": note_errors
-            })
-        
-        time.sleep(1) 
+    with open(PRED_PATH, "w", encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-    # Generate the Markdown results table
-    with open(results_path, "w", encoding="utf-8") as f:
-        f.write("# 評価結果 (Evaluation Results)\n\n")
-        f.write("## フィールド別精度 (Field Accuracy)\n\n")
-        f.write("| フィールド (Field) | 精度 (Accuracy) | 正解数 (Correct/Total) |\n")
-        f.write("| --- | --- | --- |\n")
-        
-        total_correct = 0
-        total_fields = 0
-        for field in fields:
-            acc = scores[field]["correct"] / scores[field]["total"] * 100
-            f.write(f"| {field} | {acc:.1f}% | {scores[field]['correct']}/{scores[field]['total']} |\n")
-            total_correct += scores[field]["correct"]
-            total_fields += scores[field]["total"]
-        
-        overall_acc = total_correct / total_fields * 100
-        f.write(f"| **Overall** | **{overall_acc:.1f}%** | **{total_correct}/{total_fields}** |\n\n")
-        
-        f.write("## 抽出エラー (Failure Logs)\n\n")
-        for err in errors:
-            f.write(f"### Note {err['note_id']}\n")
-            f.write(f"**Input:** {err['input']}\n\n")
-            for field, diff in err['errors'].items():
-                f.write(f"- **{field}**\n")
-                f.write(f"  - Expected: `{diff['expected']}`\n")
-                f.write(f"  - Extracted: `{diff['extracted']}`\n")
-            f.write("\n")
+    latencies = [r["latency_s"] for r in rows if r["latency_s"] is not None]
+    meta = {
+        "run_date_ist": datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30))).isoformat(timespec="minutes"),
+        "model": MODEL_NAME,
+        "temperature": TEMPERATURE,
+        "notes": len(rows),
+        "api_calls": len(rows),
+        "failed_calls": sum(1 for r in rows if not r["success"]),
+        "prompt_tokens": sum(r["prompt_tokens"] or 0 for r in rows),
+        "completion_tokens": sum(r["completion_tokens"] or 0 for r in rows),
+        "total_tokens": sum(r["total_tokens"] or 0 for r in rows),
+        "avg_latency_s": round(sum(latencies) / len(latencies), 2) if latencies else None,
+    }
+    with open(META_PATH, "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+    print(f"\nSaved {PRED_PATH} and {META_PATH}. Next: python eval/judge.py && python eval/report.py")
 
-    print(f"\nEvaluation complete. Results saved to {results_path}")
 
 if __name__ == "__main__":
     run_eval()
