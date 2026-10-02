@@ -20,7 +20,7 @@
 
 デモサイト: https://retro-jp-meeting-to-crm-fields.streamlit.app/
 
-![スクリーンショット](docs/screenshot.png)
+![スクリーンショット（日本語UI）](docs/screenshot_ja.png)
 
 - 一定時間アクセスがないとスリープ状態になります。画面のボタンを押すと起動します。
 - 入力は 2,000 文字まで、実行は 1 セッションあたり 5 回までです。全体で 1 日の実行上限もあります。

@@ -106,7 +106,7 @@ Five representative misses from the iteration 5 run (gold → predicted):
 4. **Company-name rule broken.** In note 21, `(同)オメガパートナーズ` gives `オメガパートナーズ`, where the gold is `合同会社オメガパートナーズ`. In missing_5 note 2, `さくら物流(株)` gives `株式会社さくら物流`: the legal-entity position moved to the front, which the prompt forbids.
 5. **Guess instead of `未検出`.** missing_5 note 4 has no next action (「今回は情報交換のみ」), but the model output `次アクション: 情報交換` instead of `未検出`.
 
-![Streamlit app: Japanese meeting note → CRM fields](docs/screenshot.png)
+![Streamlit app: Japanese meeting note → CRM fields](docs/screenshot_en.png)
 
 *The live deployed app (Streamlit Community Cloud) on a fictional sample note, showing latency/token telemetry, the demo-limit counter, and the raw JSON output.*
 
@@ -119,7 +119,8 @@ Five representative misses from the iteration 5 run (gold → predicted):
 │   ├── gold_30.jsonl          # 30-note labeled evaluation dataset (frozen)
 │   └── missing_5.jsonl        # 5 synthetic notes with 1–2 missing fields (gold 未検出)
 ├── docs/
-│   └── screenshot.png         # Live app screenshot (fictional sample note)
+│   ├── screenshot_en.png      # Live app, English UI (fictional sample note)
+│   └── screenshot_ja.png      # Live app, Japanese UI (fictional sample note)
 ├── eval/
 │   ├── run_eval.py            # Runs the extraction on a labelled set, saves predictions + run metadata
 │   ├── judge.py               # LLM-as-judge (semantic) scoring for 次アクション and リスク
