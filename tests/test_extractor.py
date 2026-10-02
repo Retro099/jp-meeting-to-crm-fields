@@ -56,3 +56,27 @@ def test_parse_json_object():
     assert extractor.parse_json_object('{"a": 1}') == {"a": 1}
     with pytest.raises(ValueError):
         extractor.parse_json_object('"text"')
+
+
+def test_normalize_fields_marks_missing_as_not_found():
+    from prompts import CRM_FIELDS, NOT_FOUND
+    raw = {"会社名": "株式会社ABC", "相手": None, "期限": "  ", "リスク": ["予算", "競合"], "extra": "x"}
+    out = extractor.normalize_fields(raw)
+    assert list(out) == CRM_FIELDS
+    assert out == {"会社名": "株式会社ABC", "相手": NOT_FOUND, "次アクション": NOT_FOUND,
+                   "期限": NOT_FOUND, "リスク": "予算、競合"}
+
+
+def test_not_found_value_is_kept_as_is():
+    content = json.dumps({**GOOD, "期限": "未検出", "リスク": "未検出"}, ensure_ascii=False)
+    result = extractor.extract_crm_data(FakeClient(content), "メモ")
+    assert result["success"]
+    assert result["data"]["期限"] == "未検出" and result["data"]["リスク"] == "未検出"
+    assert result["raw_data"]["期限"] == "未検出"
+
+
+def test_missing_keys_from_model_become_not_found():
+    content = json.dumps({"会社名": "株式会社ABC"}, ensure_ascii=False)
+    result = extractor.extract_crm_data(FakeClient(content), "メモ")
+    assert result["success"] and result["data"]["相手"] == "未検出"
+    assert result["raw_data"] == {"会社名": "株式会社ABC"}

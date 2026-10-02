@@ -35,7 +35,7 @@ Measured at temperature=0 on 2026-09-30 with `qwen/qwen-2.5-72b-instruct` on the
 
 Cost is an estimate: $0.36/M input and $0.4/M output tokens (upstream rate), × 1.05 forex buffer × 1.05 platform fee (AICredits pricing docs), at USD/INR 96.06 (open.er-api.com rate, 2026-09-30). The AICredits dashboard shows the exact amount charged.
 
-A manual spot-check of the judge verdicts is in [judge_spotcheck.md](judge_spotcheck.md).
+An AI-assisted spot-check (all 60 verdicts) of the judge verdicts is in [judge_spotcheck.md](judge_spotcheck.md); manual verification by the author is pending.
 
 ## 抽出エラー (Failure Logs, exact match)
 

@@ -4,6 +4,7 @@ import json
 import re
 
 FIELDS = ["会社名", "相手", "次アクション", "期限", "リスク"]
+NOT_FOUND = "未検出"  # same marker as prompts.NOT_FOUND
 JUDGED_FIELDS = ["次アクション", "リスク"]
 VERDICT_POINTS = {"match": 1.0, "partial": 0.5, "miss": 0.0}
 
@@ -28,6 +29,26 @@ def overall(scores):
     correct = sum(s["correct"] for s in scores.values())
     total = sum(s["total"] for s in scores.values())
     return correct, total
+
+
+def score_not_found(records, fields=FIELDS):
+    """How the model uses the 未検出 marker. records: iterable of (expected_dict, predicted_dict).
+
+    absent_total / absent_correct: gold is 未検出, and the prediction is exactly 未検出.
+    present_total / false_not_found: gold has a value, but the prediction is 未検出 (a wrong "not found").
+    """
+    out = {"absent_total": 0, "absent_correct": 0, "present_total": 0, "false_not_found": 0}
+    for expected, predicted in records:
+        for f in fields:
+            gold_absent = str(expected.get(f, "")).strip() == NOT_FOUND
+            pred_absent = str(predicted.get(f, "")).strip() == NOT_FOUND
+            if gold_absent:
+                out["absent_total"] += 1
+                out["absent_correct"] += pred_absent
+            else:
+                out["present_total"] += 1
+                out["false_not_found"] += pred_absent
+    return out
 
 
 def parse_verdict(text):

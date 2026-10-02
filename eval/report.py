@@ -1,4 +1,5 @@
-"""Build eval/results.md from eval/predictions_t0.jsonl, eval/judge_results.jsonl and the run metadata.
+"""Build eval/results.md from eval/predictions_t0.jsonl, eval/judge_results.jsonl, the run metadata and,
+if present, the missing-field set (eval/predictions_missing5.jsonl, eval/run_meta_missing5.json).
 
 No API calls.  Usage:  python eval/report.py [--usd-inr 96.06]
 """
@@ -10,7 +11,9 @@ import sys
 
 EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, EVAL_DIR)
-from scoring import FIELDS, JUDGED_FIELDS, overall, score_exact, summarize_verdicts  # noqa: E402
+from scoring import FIELDS, JUDGED_FIELDS, overall, score_exact, score_not_found, summarize_verdicts  # noqa: E402
+
+ITER4_URL = "https://github.com/Retro099/jp-meeting-to-crm-fields/blob/ed59caf/eval/results.md"
 
 # AICredits bills the upstream (OpenRouter) rate, converted to INR with a 5% forex buffer + 5% platform fee.
 USD_PER_M_INPUT = 0.36
@@ -48,9 +51,10 @@ def build(usd_inr):
     sem = {f: summarize_verdicts([j["verdict"] for j in judged if j["field"] == f and j["verdict"]])
            for f in JUDGED_FIELDS}
 
+    nf30 = score_not_found((r["expected"], r["predicted"]) for r in preds)
     out = ["# 評価結果 (Evaluation Results)", "",
            f"Measured at temperature=0 on {meta['run_date_ist'][:10]} with `{meta['model']}` "
-           f"on the 30 labelled notes in `data/gold_30.jsonl`.", "",
+           f"on the 30 labelled notes in `data/gold_30.jsonl`, with the 未検出 (not found) prompt rule.", "",
            "## フィールド別精度 (Field Accuracy)", "",
            "| フィールド (Field) | Exact match | 正解数 (Correct/Total) | LLM-judge (semantic) | LLM-judge strict (match only) |",
            "| --- | --- | --- | --- | --- |"]
@@ -65,6 +69,8 @@ def build(usd_inr):
         out.append(f"| {f} | {pct(s['correct'] / s['total'])} | {s['correct']}/{s['total']} | {sem_cell} | {strict_cell} |")
     out.append(f"| **Overall** | **{pct(correct / total)}** | **{correct}/{total}** | — | — |")
     out += ["",
+            f"- **未検出 on gold_30**: every gold field has a value, so any 未検出 prediction is wrong. "
+            f"This run predicted 未検出 for {nf30['false_not_found']}/{nf30['present_total']} fields.",
             "- **Exact match**: the predicted string must equal the gold string after trimming whitespace.",
             "- **LLM-judge (semantic)**: only for 次アクション and リスク. The same model grades each prediction "
             "against the gold answer (`eval/judge.py`, prompt in `eval/judge_prompt.txt`, temperature 0): "
@@ -76,8 +82,32 @@ def build(usd_inr):
             "| Iteration 1 | 28.7% |",
             "| Iteration 2 | 53.3% |",
             "| Iteration 3 — before temperature=0 ([details](results_pre_t0.md)) | 56.0% |",
-            f"| Iteration 4 — same prompt, temperature=0 (this run) | {pct(correct / total)} |",
-            "", "## Cost and latency (measured)", ""]
+            f"| Iteration 4 — same prompt, temperature=0 ([details]({ITER4_URL})) | 59.3% |",
+            f"| Iteration 5 — 未検出 rule added to the prompt, temperature=0 (this run) | {pct(correct / total)} |",
+            ""]
+
+    m5_rows, m5meta = None, None
+    if os.path.exists(os.path.join(EVAL_DIR, "predictions_missing5.jsonl")):
+        m5_rows = load_jsonl("predictions_missing5.jsonl")
+        m5meta = load_json("run_meta_missing5.json")
+        m5_scores = score_exact((r["expected"], r["predicted"]) for r in m5_rows)
+        m5_c, m5_t = overall(m5_scores)
+        nf5 = score_not_found((r["expected"], r["predicted"]) for r in m5_rows)
+        out += ["## Missing-field set (`data/missing_5.jsonl`, synthetic)", "",
+                "5 synthetic notes written for this check, each missing 1–2 fields; the gold label for a missing "
+                "field is `未検出`. Separate from the frozen 30-note set, and too small for a stable percentage.", "",
+                "| Measure | Result |", "| --- | --- |",
+                f"| Absent fields correctly output as 未検出 | {nf5['absent_correct']}/{nf5['absent_total']} |",
+                f"| Present fields wrongly output as 未検出 | {nf5['false_not_found']}/{nf5['present_total']} |",
+                f"| Exact match, all fields | {m5_c}/{m5_t} ({pct(m5_c / m5_t)}) |", "",
+                "| Note | Missing (gold 未検出) | Predicted for the missing fields |", "| --- | --- | --- |"]
+        for r in m5_rows:
+            miss = [f for f in FIELDS if str(r["expected"].get(f, "")).strip() == "未検出"]
+            got = ", ".join(f"{f}: `{r['predicted'].get(f, '')}`" for f in miss)
+            out.append(f"| {r['note_id']} | {', '.join(miss)} | {got} |")
+        out.append("")
+
+    out += ["## Cost and latency (measured)", ""]
     ext_inr = inr_estimate(meta["prompt_tokens"], meta["completion_tokens"], usd_inr)
     j_inr = inr_estimate(jmeta["prompt_tokens"], jmeta["completion_tokens"], usd_inr)
     out += ["| Run | API calls | Prompt tokens | Completion tokens | Total tokens | Est. cost | Avg latency |",
@@ -85,7 +115,14 @@ def build(usd_inr):
             f"| Extraction (30 notes) | {meta['api_calls']} | {meta['prompt_tokens']:,} | {meta['completion_tokens']:,} | "
             f"{meta['total_tokens']:,} | ≈ ₹{ext_inr:.2f} | {meta['avg_latency_s']} s / note |",
             f"| LLM judge | {jmeta['api_calls']} | {jmeta['prompt_tokens']:,} | {jmeta['completion_tokens']:,} | "
-            f"{jmeta['total_tokens']:,} | ≈ ₹{j_inr:.2f} | {jmeta['avg_latency_s']} s / call |",
+            f"{jmeta['total_tokens']:,} | ≈ ₹{j_inr:.2f} | {jmeta['avg_latency_s']} s / call |"]
+    m5_inr = 0.0
+    if m5meta:
+        m5_inr = inr_estimate(m5meta["prompt_tokens"], m5meta["completion_tokens"], usd_inr)
+        out.append(f"| Extraction, missing-field set (5 notes) | {m5meta['api_calls']} | {m5meta['prompt_tokens']:,} | "
+                   f"{m5meta['completion_tokens']:,} | {m5meta['total_tokens']:,} | ≈ ₹{m5_inr:.2f} | "
+                   f"{m5meta['avg_latency_s']} s / note |")
+    out += ["", f"Total for this eval run: ≈ ₹{ext_inr + j_inr + m5_inr:.2f}.",
             "",
             f"Cost is an estimate: ${USD_PER_M_INPUT}/M input and ${USD_PER_M_OUTPUT}/M output tokens (upstream rate), "
             f"× 1.05 forex buffer × 1.05 platform fee (AICredits pricing docs), at USD/INR {usd_inr} (open.er-api.com rate, 2026-09-30). "
@@ -95,7 +132,9 @@ def build(usd_inr):
                 "(a failed extraction counts as empty, i.e. wrong).", ""]
 
     if os.path.exists(os.path.join(EVAL_DIR, "judge_spotcheck.md")):
-        out += ["A manual spot-check of the judge verdicts is in [judge_spotcheck.md](judge_spotcheck.md).", ""]
+        out += ["An AI-assisted spot-check (all 60 verdicts) of the iteration 4 judge verdicts is in "
+                "[judge_spotcheck.md](judge_spotcheck.md); manual verification by the author is pending. "
+                "It was not repeated for this run.", ""]
     out += ["## 抽出エラー (Failure Logs, exact match)", ""]
     jmap = {(j["note_id"], j["field"]): j for j in judged}
     for r in preds:
@@ -116,7 +155,7 @@ def build(usd_inr):
         fh.write("\n".join(out))
     print(f"Overall exact match {correct}/{total} = {pct(correct / total)}")
     print(json.dumps(sem, ensure_ascii=False))
-    print(f"Est. cost: extraction ₹{ext_inr:.3f}, judge ₹{j_inr:.3f}")
+    print(f"Est. cost: extraction ₹{ext_inr:.3f}, judge ₹{j_inr:.3f}, missing5 ₹{m5_inr:.3f}")
 
 
 if __name__ == "__main__":

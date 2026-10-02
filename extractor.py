@@ -6,7 +6,7 @@ The OpenAI-compatible client is passed in, so tests can use a fake client with n
 import json
 import time
 
-from prompts import MODEL_NAME, SYSTEM_PROMPT, TEMPERATURE
+from prompts import CRM_FIELDS, MODEL_NAME, NOT_FOUND, SYSTEM_PROMPT, TEMPERATURE
 
 
 def build_messages(text):
@@ -27,8 +27,25 @@ def parse_json_object(content):
     return data
 
 
+def normalize_fields(data):
+    """Return the five CRM fields as strings, in CRM_FIELDS order.
+
+    A missing key, null, or blank value becomes NOT_FOUND ("未検出"), so the app and the eval
+    see one consistent marker. A list (e.g. several contacts) is joined with "、".
+    Other keys the model may add are dropped.
+    """
+    out = {}
+    for field in CRM_FIELDS:
+        value = data.get(field)
+        if isinstance(value, list):
+            value = "、".join(str(v).strip() for v in value if v is not None and str(v).strip())
+        value = "" if value is None else str(value).strip()
+        out[field] = value if value else NOT_FOUND
+    return out
+
+
 def extract_crm_data(client, text):
-    """Call the model once. Returns a dict with success, data or error, latency and token usage."""
+    """Call the model once. Returns a dict with success, data (normalized) / raw_data or error, latency and token usage."""
     start = time.perf_counter()
     try:
         response = client.chat.completions.create(
@@ -39,9 +56,11 @@ def extract_crm_data(client, text):
         )
         latency = round(time.perf_counter() - start, 2)
         usage = response.usage
+        raw = parse_json_object(response.choices[0].message.content)
         return {
             "success": True,
-            "data": parse_json_object(response.choices[0].message.content),
+            "data": normalize_fields(raw),
+            "raw_data": raw,
             "latency": latency,
             "prompt_tokens": getattr(usage, "prompt_tokens", None),
             "completion_tokens": getattr(usage, "completion_tokens", None),

@@ -18,11 +18,13 @@ Sales reps write quick, messy notes after a customer call, and then have to re-t
 
 **Demo limits:** to protect the API budget, the hosted demo allows at most 2,000 characters per note, 5 runs per visitor session, and a shared daily cap on total runs.
 
+**Privacy:** text you paste is sent to the API provider (AICredits) and the upstream model host, so don't paste confidential or personal data. The app shows the same note next to the input box.
+
 ## 🏗️ Architecture & Tech Stack
 * **LLM Engine:** Qwen 2.5 72B Instruct
 * **API Gateway:** AICredits (OpenAI SDK compatible, enabling cost-effective and region-unlocked model access)
-* **Frontend UI:** Streamlit (featuring token economy tracking, execution latency, and a developer payload view)
-* **Deployment:** Docker (`python:3.11-slim`) with constrained memory limits via `.wslconfig` for efficient local execution.
+* **Frontend UI:** Streamlit with a Japanese/English toggle (Japanese by default). The five fields are shown as editable inputs (`未検出` when the note has no value), and the edited values can be copied or downloaded as JSON. Latency, token usage, and the raw model JSON are shown too.
+* **Deployment:** Docker (`python:3.11-slim`) for local runs; Streamlit Community Cloud for the hosted demo.
 * **Evaluation:** Custom Python evaluation loop for exact-match validation against a gold-standard dataset.
 
 ## 🧠 Japanese NLP & Prompt Engineering
@@ -31,11 +33,12 @@ Extracting data from Japanese business notes requires handling specific linguist
 2. **Honorific Stripping:** Removing departmental noise and titles (`様`, `さん`, `社長`, `部長`) to isolate raw contact names.
 3. **Nominal Phrase Formatting (体言止め):** Transforming conversational next-action verbs into professional, concise noun phrases.
 4. **Temporal Normalization:** Stripping conversational suffixes (e.g., `まで`) from deadlines to ensure strict CRM date-string compliance.
+5. **Missing fields (未検出):** if a field is truly absent from the note, the model must output exactly `未検出` instead of guessing. The app and eval also turn a missing key, null, or blank value into `未検出`.
 
 ## 📊 Evaluation Metrics
 The pipeline is evaluated against a 30-note labeled dataset (`data/gold_30.jsonl`) with a strict exact-string match, plus an LLM-as-judge semantic score for the two free-text fields.
 
-*Data note:* the 30 evaluation notes (`data/gold_30.jsonl`) are synthetic, LLM-generated Japanese business meeting notes with gold labels prepared for this eval; no real customer or interview data is used.
+*Data note:* the 30 evaluation notes (`data/gold_30.jsonl`) are synthetic, LLM-generated Japanese business meeting notes with gold labels prepared for this eval; no real customer or interview data is used. `data/missing_5.jsonl` is a separate, **synthetic** set of 5 notes written for the `未検出` check, each missing 1–2 fields (gold label `未検出`). It is not part of the frozen 30-note score.
 
 Measured at temperature=0 on 2026-09-30 (single run on GitHub Actions, same prompt and model as the app). Full details and per-note failure logs: [`eval/results.md`](eval/results.md).
 
@@ -65,7 +68,7 @@ Per-field results (temperature=0):
 
 **How far to trust the judge:**
 - The judge is the same model family as the extractor, so expect some self-judging bias.
-- A manual spot-check of all 60 verdicts ([`eval/judge_spotcheck.md`](eval/judge_spotcheck.md)) agreed with 53/60 (88%). All 7 disagreements were the judge being too lenient.
+- An AI-assisted spot-check (all 60 verdicts); manual verification by the author is pending ([`eval/judge_spotcheck.md`](eval/judge_spotcheck.md)). It agreed with 53/60 (88%). All 7 disagreements were the judge being too lenient.
 - With the spot-check verdicts, the scores would be 81.7% (次アクション) and 73.3% (リスク).
 
 **Compared with iteration 3:** the +3.3 points come from 次アクション (+3 notes) and 期限 (+3 notes); リスク dropped from 1/30 to 0/30. Both results are single runs on 30 notes, so part of the difference may be run-to-run variation rather than the temperature change.
@@ -87,7 +90,7 @@ Five representative misses from the temperature=0 run (gold → predicted):
 2. **Second risk missing.** Note 5 リスク: `現状の運用フローへの不満、解約の可能性` → `解約の可能性`. The model often keeps only the most serious risk; 13 of the 15 `partial` リスク verdicts are cases like this.
 3. **Deadline wording slip.** Note 25 期限: `今週水曜の午前中` → `今週水曜`. The time of day is lost. A smaller version of the same slip: `明日中` → `明日` (notes 10, 13, 30).
 4. **Company-name rule broken.** Note 29 会社名: `ファーストステップ合同会社` → `合同会社ファーストステップ`. The prompt says to keep the legal-entity position, but the model moved it to the front. Also, in note 21 `(同)オメガパートナーズ` gives `オメガパートナーズ`, where the gold is `合同会社オメガパートナーズ`.
-5. **Judge too lenient.** Note 13 次アクション: `修正要望の確認および回答` → `確認後、回答`. The judge says `match`, but the object (the revision requests) is missing, so the manual check scores it `partial`.
+5. **Judge too lenient.** Note 13 次アクション: `修正要望の確認および回答` → `確認後、回答`. The judge says `match`, but the object (the revision requests) is missing, so the AI-assisted check scores it `partial`.
 
 ![Streamlit app: Japanese meeting note → CRM fields](docs/screenshot.png)
 
@@ -99,11 +102,12 @@ Five representative misses from the temperature=0 run (gold → predicted):
 │   ├── ci.yml                 # CI: pytest on Python 3.11 (no network, no secrets)
 │   └── eval.yml               # Manual eval run (workflow_dispatch, uses the AICREDITS_API_KEY secret)
 ├── data/
-│   └── gold_30.jsonl          # 30-note labeled evaluation dataset (frozen)
+│   ├── gold_30.jsonl          # 30-note labeled evaluation dataset (frozen)
+│   └── missing_5.jsonl        # 5 synthetic notes with 1–2 missing fields (gold 未検出)
 ├── docs/
 │   └── screenshot.png         # Live app screenshot (fictional sample note)
 ├── eval/
-│   ├── run_eval.py            # Runs the extraction on the 30 notes, saves predictions + run metadata
+│   ├── run_eval.py            # Runs the extraction on a labelled set, saves predictions + run metadata
 │   ├── judge.py               # LLM-as-judge (semantic) scoring for 次アクション and リスク
 │   ├── judge_prompt.txt       # Judge prompt (Japanese/English, JSON output)
 │   ├── scoring.py             # Exact-match and judge-verdict scoring (pure functions)
@@ -112,10 +116,10 @@ Five representative misses from the temperature=0 run (gold → predicted):
 │   ├── run_meta_t0.json       # Run date, calls, tokens, avg latency (extraction)
 │   ├── judge_results.jsonl    # Per-field judge verdicts and reasons
 │   ├── judge_meta.json        # Judge calls, tokens, latency and summary
-│   ├── judge_spotcheck.md     # Manual check of all 60 judge verdicts
+│   ├── judge_spotcheck.md     # AI-assisted check of all 60 judge verdicts (author check pending)
 │   ├── results.md             # Current results, cost/latency, failure logs
 │   └── results_pre_t0.md      # History: iteration 3 results before temperature=0
-├── tests/                     # pytest unit tests (mocked client, no API key needed)
+├── tests/                     # pytest unit tests + Streamlit AppTest smoke tests (mocked client, no API key needed)
 ├── .dockerignore              # Docker build exclusions
 ├── .gitignore                 # Enforces security exclusions (.env, pycache)
 ├── Dockerfile                 # Container definition (Exposes port 8501)
@@ -125,6 +129,7 @@ Five representative misses from the temperature=0 run (gold → predicted):
 ├── demo_limits.py             # Input-length check and per-session / daily run caps
 ├── extractor.py               # The extraction API call + JSON parsing (used by app + eval)
 ├── prompts.py                 # Shared system prompt, model name and settings (used by app + eval)
+├── ui_strings.py              # UI text in Japanese (default) and English
 ├── pytest.ini                 # pytest settings
 ├── requirements.txt           # Minimal pinned runtime dependencies
 └── requirements-dev.txt       # Test dependencies (pytest)
@@ -181,10 +186,11 @@ pytest -q
 
 GitHub Actions runs the same tests on every push and pull request to `main` (Python 3.11).
 
-To re-run the eval (about 90 API calls in total), set `AICREDITS_API_KEY` in your environment and run:
+To re-run the eval (95 API calls in total), set `AICREDITS_API_KEY` in your environment and run:
 
 ```bash
 python eval/run_eval.py   # 30 extraction calls -> eval/predictions_t0.jsonl
+python eval/run_eval.py --data data/missing_5.jsonl --tag missing5   # 5 calls -> eval/predictions_missing5.jsonl
 python eval/judge.py      # 60 judge calls      -> eval/judge_results.jsonl
 python eval/report.py     # no API calls        -> eval/results.md
 ```
@@ -209,4 +215,4 @@ Community Cloud installs the pinned packages from `requirements.txt`. Apps with 
 - The judge is the same model family as the extractor and was lenient in the spot-check. A different judge model, or a review by a Japanese-speaking domain expert, would make the semantic scores more reliable.
 - Prompt fixes suggested by the failure analysis: keep `中` in deadlines (`明日中`, `午前中`), list every risk, keep the legal-entity position, and expand `(同)`. The prompt was intentionally left unchanged in this iteration.
 - The eval set is small (30 synthetic notes), so a few notes change the score by several points.
-- Let users edit the extracted fields in the UI, and show "not found" for missing fields.
+- Done: editable fields in the UI with JSON copy/download, `未検出` for missing fields, and a Japanese/English UI toggle.

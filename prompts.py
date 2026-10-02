@@ -7,6 +7,12 @@ MODEL_NAME = "qwen/qwen-2.5-72b-instruct"
 API_BASE_URL = "https://api.aicredits.in/v1"
 TEMPERATURE = 0
 
+# Value used when a field is truly absent from the note (prompt rule 6; the app and eval use the same string)
+NOT_FOUND = "未検出"
+
+# The five CRM fields, in display order
+CRM_FIELDS = ["会社名", "相手", "次アクション", "期限", "リスク"]
+
 SYSTEM_PROMPT = """あなたは優秀なCRMデータ抽出APIです。
 ユーザーが入力する商談メモから、以下の5つのフィールドを抽出し、厳密なJSONフォーマットのみで出力してください。
 Markdownブロック（```json）や余計な解説は一切含めないでください。
@@ -17,6 +23,7 @@ Markdownブロック（```json）や余計な解説は一切含めないでく�
 3. 次アクション: 文末は必ず体言止め（名詞形）で簡潔にまとめること（例：「〜を送付する」ではなく「〜の送付」）。助詞の「の」の有無など、簡潔な名詞句を心がけること。
 4. 期限: メモに記載されている期限をそのまま抽出すること。ただし、末尾の「まで」は必ず削除すること（例：「今月末まで」→「今月末」）。
 5. リスク: 案件における懸念点やリスクを、簡潔な要約文として抽出すること。
+6. 未検出: メモにその項目の情報が本当に存在しない場合は、推測や補完をせず、値を必ず「未検出」とすること（空文字・null・「なし」は使わないこと）。5つのキーは常にすべて出力すること。
 
 【抽出項目】
 - 会社名

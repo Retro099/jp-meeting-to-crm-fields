@@ -1,9 +1,12 @@
-"""Run the extraction eval on data/gold_30.jsonl and save predictions + run metadata.
+"""Run the extraction eval on a labelled JSONL set and save predictions + run metadata.
 
-Usage (key via the environment only):  python eval/run_eval.py
-Writes eval/predictions_t0.jsonl and eval/run_meta_t0.json, then run eval/report.py.
+Usage (key via the environment only):
+    python eval/run_eval.py                                        # data/gold_30.jsonl -> *_t0 files
+    python eval/run_eval.py --data data/missing_5.jsonl --tag missing5
+Writes eval/predictions_<tag>.jsonl and eval/run_meta_<tag>.json, then run eval/report.py.
 """
 
+import argparse
 import datetime
 import json
 import os
@@ -20,8 +23,11 @@ from extractor import extract_crm_data  # noqa: E402
 from prompts import API_BASE_URL, MODEL_NAME, TEMPERATURE  # noqa: E402
 
 DATA_PATH = os.path.join(EVAL_DIR, "..", "data", "gold_30.jsonl")
-PRED_PATH = os.path.join(EVAL_DIR, "predictions_t0.jsonl")
-META_PATH = os.path.join(EVAL_DIR, "run_meta_t0.json")
+DEFAULT_TAG = "t0"
+
+
+def output_paths(tag=DEFAULT_TAG):
+    return (os.path.join(EVAL_DIR, f"predictions_{tag}.jsonl"), os.path.join(EVAL_DIR, f"run_meta_{tag}.json"))
 
 
 def load_gold(path=DATA_PATH):
@@ -29,10 +35,11 @@ def load_gold(path=DATA_PATH):
         return [json.loads(line) for line in f if line.strip()]
 
 
-def run_eval():
+def run_eval(data_path=DATA_PATH, tag=DEFAULT_TAG):
     load_dotenv()
     client = OpenAI(api_key=os.getenv("AICREDITS_API_KEY"), base_url=API_BASE_URL)
-    records = load_gold()
+    records = load_gold(data_path)
+    pred_path, meta_path = output_paths(tag)
     print(f"Starting evaluation of {len(records)} notes using {MODEL_NAME} (temperature={TEMPERATURE})...")
 
     rows = []
@@ -55,13 +62,14 @@ def run_eval():
         })
         time.sleep(1)
 
-    with open(PRED_PATH, "w", encoding="utf-8") as f:
+    with open(pred_path, "w", encoding="utf-8") as f:
         for row in rows:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
     latencies = [r["latency_s"] for r in rows if r["latency_s"] is not None]
     meta = {
         "run_date_ist": datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30))).isoformat(timespec="minutes"),
+        "dataset": os.path.relpath(os.path.abspath(data_path), os.path.join(EVAL_DIR, "..")),
         "model": MODEL_NAME,
         "temperature": TEMPERATURE,
         "notes": len(rows),
@@ -72,10 +80,14 @@ def run_eval():
         "total_tokens": sum(r["total_tokens"] or 0 for r in rows),
         "avg_latency_s": round(sum(latencies) / len(latencies), 2) if latencies else None,
     }
-    with open(META_PATH, "w", encoding="utf-8") as f:
+    with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)
-    print(f"\nSaved {PRED_PATH} and {META_PATH}. Next: python eval/judge.py && python eval/report.py")
+    print(f"\nSaved {pred_path} and {meta_path}. Next: python eval/judge.py && python eval/report.py")
 
 
 if __name__ == "__main__":
-    run_eval()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--data", default=DATA_PATH, help="labelled JSONL set (default: data/gold_30.jsonl)")
+    ap.add_argument("--tag", default=DEFAULT_TAG, help="output suffix (default: t0)")
+    args = ap.parse_args()
+    run_eval(args.data, args.tag)
