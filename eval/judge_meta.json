@@ -2,31 +2,31 @@
   "model": "qwen/qwen-2.5-72b-instruct",
   "temperature": 0,
   "api_calls": 60,
-  "failed_calls": 0,
-  "prompt_tokens": 34532,
-  "completion_tokens": 1893,
-  "total_tokens": 36425,
-  "avg_latency_s": 2.58,
+  "failed_calls": 8,
+  "prompt_tokens": 29826,
+  "completion_tokens": 1661,
+  "total_tokens": 31487,
+  "avg_latency_s": 13.08,
   "summary": {
     "次アクション": {
-      "n": 30,
+      "n": 26,
       "counts": {
-        "match": 25,
-        "partial": 5,
+        "match": 20,
+        "partial": 6,
         "miss": 0
       },
-      "semantic_score": 0.9166666666666666,
-      "strict_match_rate": 0.8333333333333334
+      "semantic_score": 0.8846153846153846,
+      "strict_match_rate": 0.7692307692307693
     },
     "リスク": {
-      "n": 30,
+      "n": 26,
       "counts": {
-        "match": 15,
-        "partial": 15,
+        "match": 8,
+        "partial": 18,
         "miss": 0
       },
-      "semantic_score": 0.75,
-      "strict_match_rate": 0.5
+      "semantic_score": 0.6538461538461539,
+      "strict_match_rate": 0.3076923076923077
     }
   }
 }

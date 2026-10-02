@@ -40,7 +40,7 @@ The pipeline is evaluated against a 30-note labeled dataset (`data/gold_30.jsonl
 
 *Data note:* the 30 evaluation notes (`data/gold_30.jsonl`) are synthetic, LLM-generated Japanese business meeting notes with gold labels prepared for this eval; no real customer or interview data is used. `data/missing_5.jsonl` is a separate, **synthetic** set of 5 notes written for the `未検出` check, each missing 1–2 fields (gold label `未検出`). It is not part of the frozen 30-note score.
 
-Measured at temperature=0 on 2026-09-30 (single run on GitHub Actions, same prompt and model as the app). Full details and per-note failure logs: [`eval/results.md`](eval/results.md).
+Measured at temperature=0 on 2026-10-02 (single run on GitHub Actions, [run 36997123093](https://github.com/Retro099/jp-meeting-to-crm-fields/actions/runs/36997123093), same prompt and model as the app). Full details and per-note failure logs: [`eval/results.md`](eval/results.md).
 
 ### Results
 
@@ -51,46 +51,60 @@ Overall exact-match accuracy on 150 fields (30 notes × 5 fields), by iteration:
 | Iteration 1 | 28.7% |
 | Iteration 2 | 53.3% |
 | Iteration 3, before temperature=0 ([details](eval/results_pre_t0.md)) | 56.0% (84/150) |
-| Iteration 4, same prompt at temperature=0 (current) | **59.3%** (89/150) |
+| Iteration 4, same prompt at temperature=0 ([details](https://github.com/Retro099/jp-meeting-to-crm-fields/blob/ed59caf/eval/results.md)) | 59.3% (89/150) |
+| Iteration 5, 未検出 rule added to the prompt, temperature=0 (current) | **60.0%** (90/150) |
 
-Per-field results (temperature=0):
+Per-field results (iteration 5, temperature=0):
 
 | Field (抽出項目) | Exact match | Correct/Total | LLM-judge (semantic) | LLM-judge strict (match only) |
 | :--- | :--- | :--- | :--- | :--- |
 | **Contact (相手)** | 100.0% | 30/30 | — | — |
-| **Company (会社名)** | 93.3% | 28/30 | — | — |
+| **Company (会社名)** | 96.7% | 29/30 | — | — |
 | **Deadline (期限)** | 80.0% | 24/30 | — | — |
-| **Action (次アクション)** | 23.3% | 7/30 | 91.7% (25 match / 5 partial / 0 miss) | 83.3% (25/30) |
-| **Risk (リスク)** | 0.0% | 0/30 | 75.0% (15 match / 15 partial / 0 miss) | 50.0% (15/30) |
-| **Overall** | **59.3%** | **89/150** | | |
+| **Action (次アクション)** | 23.3% | 7/30 | 88.5% (20 match / 6 partial / 0 miss, 26 judged) | 76.9% (20/26) |
+| **Risk (リスク)** | 0.0% | 0/30 | 65.4% (8 match / 18 partial / 0 miss, 26 judged) | 30.8% (8/26) |
+| **Overall** | **60.0%** | **90/150** | | |
 
 *Exact match* compares the strings after trimming whitespace. *LLM-judge (semantic)* covers only `次アクション` and `リスク`: the same model grades each prediction against the gold answer (`eval/judge.py`, prompt in `eval/judge_prompt.txt`, temperature 0) as match = 1, partial = 0.5, miss = 0. The strict column counts `match` only.
 
+**Judge calls failed in this run:** 8 of the 60 judge calls (notes 26–30) failed with HTTP 429 from the upstream provider, so each judge column covers 26 notes, not 30. The judge scores are lower than in iteration 4 (次アクション 91.7% → 88.5%, リスク 75.0% → 65.4%), but they cover different notes and are single runs, so they are not directly comparable.
+
 **How far to trust the judge:**
 - The judge is the same model family as the extractor, so expect some self-judging bias.
-- An AI-assisted spot-check (all 60 verdicts); manual verification by the author is pending ([`eval/judge_spotcheck.md`](eval/judge_spotcheck.md)). It agreed with 53/60 (88%). All 7 disagreements were the judge being too lenient.
-- With the spot-check verdicts, the scores would be 81.7% (次アクション) and 73.3% (リスク).
+- An AI-assisted spot-check (all 60 verdicts); manual verification by the author is pending ([`eval/judge_spotcheck.md`](eval/judge_spotcheck.md)). It covers the iteration 4 verdicts and agreed with 53/60 (88%). All 7 disagreements were the judge being too lenient. It was not repeated for iteration 5.
+- With the spot-check verdicts, the iteration 4 scores would be 81.7% (次アクション) and 73.3% (リスク).
 
-**Compared with iteration 3:** the +3.3 points come from 次アクション (+3 notes) and 期限 (+3 notes); リスク dropped from 1/30 to 0/30. Both results are single runs on 30 notes, so part of the difference may be run-to-run variation rather than the temperature change.
+**Compared with iteration 4:** +0.7 points (+1 field). 会社名 went from 28/30 to 29/30 (note 29 now keeps `ファーストステップ合同会社`). 期限 stayed at 24/30: note 13 is now right (`明日中`), but note 9 got worse (`今週金曜18時` → `今週中（金曜18時）`). 相手, 次アクション and リスク have the same counts. The model predicted `未検出` for 0 of the 150 gold_30 fields, so the new rule did not cause false "not found" answers there. Both results are single runs on 30 notes, so a one-field difference is within run-to-run variation.
+
+**Missing-field check (`data/missing_5.jsonl`, 5 synthetic notes, each missing 1–2 fields):**
+
+| Measure | Result |
+| :--- | :--- |
+| Absent fields correctly output as `未検出` | 6/7 |
+| Present fields wrongly output as `未検出` | 0/18 |
+| Exact match, all fields | 18/25 |
+
+The one miss: note 4 has no next action (「今回は情報交換のみ」), but the model output `情報交換` instead of `未検出`. The set is very small, so treat it as a sanity check, not an accuracy figure.
 
 **Cost and latency (measured in this run):**
 
 | Run | API calls | Tokens (prompt + completion) | Est. cost | Avg latency |
 | :--- | :--- | :--- | :--- | :--- |
-| Extraction | 30 | 16,515 (14,382 + 2,133) | ≈ ₹0.64 (≈ ₹0.02 per note) | 4.6 s per note |
-| LLM judge | 60 | 36,425 (34,532 + 1,893) | ≈ ₹1.40 | 2.6 s per call |
+| Extraction (gold_30) | 30 | 18,453 (16,332 + 2,121) | ≈ ₹0.71 (≈ ₹0.02 per note) | 8.9 s per note |
+| Extraction (missing_5) | 5 | 2,970 (2,637 + 333) | ≈ ₹0.11 | 6.2 s per note |
+| LLM judge | 60 (8 failed) | 31,487 (29,826 + 1,661) | ≈ ₹1.21 | 13.08 s per call |
 
-*The cost estimate uses the upstream rate of $0.36/M input and $0.40/M output tokens, plus the AICredits 5% forex buffer and 5% platform fee, at USD/INR 96.06. The exact amount charged is shown in the AICredits dashboard.*
+Total for the run: ≈ ₹2.03. *The cost estimate uses the upstream rate of $0.36/M input and $0.40/M output tokens, plus the AICredits 5% forex buffer and 5% platform fee, at USD/INR 96.06. Failed calls report no tokens. The exact amount charged is shown in the AICredits dashboard.* Latency was higher than in iteration 4 (4.6 s per note), possibly related to the upstream load that also caused the 429 errors; this was not investigated.
 
 ### Failure analysis
 
-Five representative misses from the temperature=0 run (gold → predicted):
+Five representative misses from the iteration 5 run (gold → predicted):
 
 1. **Correct paraphrase counted as wrong (exact-match limitation).** Note 1 リスク: `予算取りが難航している` → `予算取りの難航`. Same meaning in noun form; the judge says `match`. This is why リスク scores 0/30 on exact match: the gold labels mix sentence and noun styles, and no prediction matches them character-for-character.
-2. **Second risk missing.** Note 5 リスク: `現状の運用フローへの不満、解約の可能性` → `解約の可能性`. The model often keeps only the most serious risk; 13 of the 15 `partial` リスク verdicts are cases like this.
-3. **Deadline wording slip.** Note 25 期限: `今週水曜の午前中` → `今週水曜`. The time of day is lost. A smaller version of the same slip: `明日中` → `明日` (notes 10, 13, 30).
-4. **Company-name rule broken.** Note 29 会社名: `ファーストステップ合同会社` → `合同会社ファーストステップ`. The prompt says to keep the legal-entity position, but the model moved it to the front. Also, in note 21 `(同)オメガパートナーズ` gives `オメガパートナーズ`, where the gold is `合同会社オメガパートナーズ`.
-5. **Judge too lenient.** Note 13 次アクション: `修正要望の確認および回答` → `確認後、回答`. The judge says `match`, but the object (the revision requests) is missing, so the AI-assisted check scores it `partial`.
+2. **Second risk missing.** Note 5 リスク: `現状の運用フローへの不満、解約の可能性` → `解約の可能性`. The model often keeps only the most serious risk.
+3. **Deadline wording slip.** Note 25 期限: `今週水曜の午前中` → `今週水曜の午前`. A smaller version of the same slip: `明日中` → `明日` (notes 10, 30). Note 9 added text: `今週金曜18時` → `今週中（金曜18時）`.
+4. **Company-name rule broken.** In note 21, `(同)オメガパートナーズ` gives `オメガパートナーズ`, where the gold is `合同会社オメガパートナーズ`. In missing_5 note 2, `さくら物流(株)` gives `株式会社さくら物流`: the legal-entity position moved to the front, which the prompt forbids.
+5. **Guess instead of `未検出`.** missing_5 note 4 has no next action (「今回は情報交換のみ」), but the model output `次アクション: 情報交換` instead of `未検出`.
 
 ![Streamlit app: Japanese meeting note → CRM fields](docs/screenshot.png)
 
@@ -213,6 +227,6 @@ Community Cloud installs the pinned packages from `requirements.txt`. Apps with 
 
 - Done: semantic (LLM-as-judge) scoring for `次アクション` and `リスク`; measured cost and latency per note; unit tests and CI.
 - The judge is the same model family as the extractor and was lenient in the spot-check. A different judge model, or a review by a Japanese-speaking domain expert, would make the semantic scores more reliable.
-- Prompt fixes suggested by the failure analysis: keep `中` in deadlines (`明日中`, `午前中`), list every risk, keep the legal-entity position, and expand `(同)`. The prompt was intentionally left unchanged in this iteration.
+- Prompt fixes suggested by the failure analysis: keep `中` in deadlines (`明日中`, `午前中`), list every risk, keep the legal-entity position, and expand `(同)`. Iteration 5 only added the `未検出` rule; these fixes are not done yet.
 - The eval set is small (30 synthetic notes), so a few notes change the score by several points.
 - Done: editable fields in the UI with JSON copy/download, `未検出` for missing fields, and a Japanese/English UI toggle.

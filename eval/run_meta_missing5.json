@@ -1,0 +1,13 @@
+{
+  "run_date_ist": "2026-10-02T16:20+05:30",
+  "dataset": "data/missing_5.jsonl",
+  "model": "qwen/qwen-2.5-72b-instruct",
+  "temperature": 0,
+  "notes": 5,
+  "api_calls": 5,
+  "failed_calls": 0,
+  "prompt_tokens": 2637,
+  "completion_tokens": 333,
+  "total_tokens": 2970,
+  "avg_latency_s": 6.2
+}
