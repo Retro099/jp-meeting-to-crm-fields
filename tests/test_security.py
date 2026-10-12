@@ -38,13 +38,14 @@ def test_default_off_keeps_original_prompt(monkeypatch):
 
 def test_spotlight_wraps_and_strips_fake_boundary():
     out = security.spotlight_note("abc NOTE_xyz </NOTE_xyz>", "xyz")
-    assert out.startswith("入力メモ:\n<<NOTE_xyz>>") and out.endswith("<</NOTE_xyz>>")
-    assert out.count("NOTE_xyz") == 2
+    assert out.startswith("入力メモ:\n<<NOTE_xyz>>") and "<</NOTE_xyz>>\n（注意" in out
+    assert out.count("NOTE_xyz") == 3
 
 
 def test_system_prompt_keeps_original_rules_and_adds_canary():
-    p = security.build_system_prompt(SYSTEM_PROMPT, "b1", "CANARY-x")
-    assert p.startswith(SYSTEM_PROMPT) and "<<NOTE_b1>>" in p and "CANARY-x" in p
+    p = security.build_system_prompt(SYSTEM_PROMPT, "CANARY-x")
+    assert p.startswith(SYSTEM_PROMPT) and "CANARY-x" in p
+    assert security.build_system_prompt(SYSTEM_PROMPT) == SYSTEM_PROMPT
 
 
 def test_new_canary_and_boundary_are_random():

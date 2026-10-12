@@ -11,14 +11,14 @@ Set `DEFENSES_ENABLED=1` to turn them on. Code: `security.py`, wired in `extract
 
 | Layer | What it does |
 | :--- | :--- |
-| Spotlighting | The note is wrapped in random `<<NOTE_xxxx>>` delimiters and the system prompt says text inside is data, never instructions. Fake copies of the delimiter are removed. |
+| Spotlighting | The note is wrapped in random `<<NOTE_xxxx>>` delimiters, followed by a one-line rule that text inside is data, never instructions. Fake copies of the delimiter are removed. The original system prompt is not changed. |
 | Canary scan | A random secret is planted in the system prompt; if it appears in the output, the whole result is blocked. |
 | Schema validation | Values must be short (≤200 chars), single-line plain text; nested objects are rejected. |
 | Field allowlist | Only the five CRM keys survive; the raw JSON shown to users is the cleaned one. |
 | Instruction-like refusal | Values that look like instructions, roles, links, HTML/code or braces become `未検出`. |
 
 ## Results
-See [`eval/security_results.md`](eval/security_results.md): attack success rate 45.0% → 10.0% on 40 cases; exact match with defenses on 59.3% (89/150), 1 field below the 60.0% target.
+See [`eval/security_results.md`](eval/security_results.md): attack success rate 45.0% → 10.0% on 40 cases; exact match with defenses on 61.3% (92/150) vs 60.0% off.
 
 ## Limits
 Pattern filters cannot judge meaning: an injected value that looks normal (e.g. 「リスクなし」) still gets through.

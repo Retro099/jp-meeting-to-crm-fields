@@ -40,14 +40,14 @@ Meeting notes can contain text written by others, so the extractor has optional 
 
 | Attack category | Cases | ASR, defenses off | ASR, defenses on |
 | :--- | :--- | :--- | :--- |
-| hidden_instruction | 8 | 3/8 (37.5%) | 1/8 (12.5%) |
+| hidden_instruction | 8 | 3/8 (37.5%) | 2/8 (25.0%) |
 | canary_leak | 8 | 5/8 (62.5%) | 0/8 (0.0%) |
 | format_break | 8 | 3/8 (37.5%) | 0/8 (0.0%) |
-| role_spoofing | 8 | 7/8 (87.5%) | 3/8 (37.5%) |
+| role_spoofing | 8 | 7/8 (87.5%) | 2/8 (25.0%) |
 | field_poisoning | 8 | 0/8 (0.0%) | 0/8 (0.0%) |
 | **All** | 40 | 18/40 (45.0%) | 4/40 (10.0%) |
 
-With defenses on, exact match on the frozen set was **59.3% (89/150)** vs 60.0% without, one field lower. The 4 attacks that still pass all inject plausible-looking values; details and limits in [`SECURITY.md`](SECURITY.md) and [`eval/security_results.md`](eval/security_results.md).
+With defenses on, exact match on the frozen set was **61.3% (92/150)** vs 60.0% without. The 4 attacks that still pass all inject plausible-looking values; details and limits in [`SECURITY.md`](SECURITY.md) and [`eval/security_results.md`](eval/security_results.md).
 
 ## 📊 Evaluation Metrics
 The pipeline is evaluated against a 30-note labeled dataset (`data/gold_30.jsonl`) with a strict exact-string match, plus an LLM-as-judge semantic score for the two free-text fields.

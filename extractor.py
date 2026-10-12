@@ -22,7 +22,7 @@ def build_messages(text, canary=None):
 def build_defended_messages(text, boundary, canary=None):
     """Spotlighting: security rules in the system prompt, the note wrapped in random delimiters."""
     return [
-        {"role": "system", "content": security.build_system_prompt(SYSTEM_PROMPT, boundary, canary)},
+        {"role": "system", "content": security.build_system_prompt(SYSTEM_PROMPT, canary)},
         {"role": "user", "content": security.spotlight_note(text, boundary)},
     ]
 
