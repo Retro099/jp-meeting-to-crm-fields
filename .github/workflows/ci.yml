@@ -20,6 +20,8 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Lint (ruff)
+        run: ruff check .
       - name: Run tests (no network, no API key)
         run: pytest -q
 
@@ -40,3 +42,5 @@ jobs:
         run: |
           python data/make_attacks_v1.py
           git diff --exit-code data/attacks_v1.jsonl
+          python data/make_attacks_v2.py
+          git diff --exit-code data/attacks_v2_heldout.jsonl

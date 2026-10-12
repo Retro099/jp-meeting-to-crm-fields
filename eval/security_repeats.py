@@ -1,6 +1,6 @@
 """Summarize repeated defenses-on runs (no API calls): exact match, ASR and provenance flags, mean and range.
 
-Reads eval/predictions_on_r*.jsonl and eval/attacks_on_r*.jsonl, writes eval/security_repeats.json.
+Reads predictions_on_r*.jsonl and attacks_on_r*.jsonl in eval/runs/2026-10-12/, writes security_repeats.json there.
 """
 
 import glob
@@ -11,6 +11,7 @@ import sys
 
 EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, EVAL_DIR)
+from paths import SECURITY_RUN, read_dir  # noqa: E402
 from scoring import overall, score_exact  # noqa: E402
 
 
@@ -39,7 +40,8 @@ def spread(values):
     return {"runs": values, "mean": round(sum(values) / len(values), 2), "min": min(values), "max": max(values)}
 
 
-def summarize(eval_dir=EVAL_DIR):
+def summarize(eval_dir=None):
+    eval_dir = eval_dir or read_dir(SECURITY_RUN)
     runs = []
     for p in sorted(glob.glob(os.path.join(eval_dir, "predictions_on_r*.jsonl")), key=_run_id):
         i = _run_id(p)
@@ -67,6 +69,6 @@ def summarize(eval_dir=EVAL_DIR):
 
 if __name__ == "__main__":
     s = summarize()
-    with open(os.path.join(EVAL_DIR, "security_repeats.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(read_dir(SECURITY_RUN), "security_repeats.json"), "w", encoding="utf-8") as f:
         json.dump(s, f, ensure_ascii=False, indent=2)
     print(json.dumps({k: v for k, v in s.items() if k != "runs"}, ensure_ascii=False))

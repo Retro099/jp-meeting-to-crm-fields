@@ -1,9 +1,9 @@
 """Run the extraction eval on a labelled JSONL set and save predictions + run metadata.
 
 Usage (key via the environment only):
-    python eval/run_eval.py                                        # data/gold_30.jsonl -> *_t0 files
+    python eval/run_eval.py                                        # data/gold_30.jsonl -> eval/runs/<date>/*_t0 files
     python eval/run_eval.py --data data/missing_5.jsonl --tag missing5
-Writes eval/predictions_<tag>.jsonl and eval/run_meta_<tag>.json, then run eval/report.py.
+Writes eval/runs/<date>/predictions_<tag>.jsonl and run_meta_<tag>.json, then run eval/report.py.
 """
 
 import argparse
@@ -19,6 +19,9 @@ from openai import OpenAI
 # Make the repo root importable so the shared prompt / extractor are used (python eval/run_eval.py)
 EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(EVAL_DIR, ".."))
+sys.path.insert(0, EVAL_DIR)
+from paths import new_run_dir  # noqa: E402
+
 from crm_extractor.extractor import extract_crm_data  # noqa: E402
 from crm_extractor.prompts import API_BASE_URL, MODEL_NAME, TEMPERATURE  # noqa: E402
 from crm_extractor.security import defenses_enabled  # noqa: E402
@@ -27,8 +30,9 @@ DATA_PATH = os.path.join(EVAL_DIR, "..", "data", "gold_30.jsonl")
 DEFAULT_TAG = "t0"
 
 
-def output_paths(tag=DEFAULT_TAG):
-    return (os.path.join(EVAL_DIR, f"predictions_{tag}.jsonl"), os.path.join(EVAL_DIR, f"run_meta_{tag}.json"))
+def output_paths(tag=DEFAULT_TAG, out_dir=None):
+    out_dir = out_dir or new_run_dir()
+    return (os.path.join(out_dir, f"predictions_{tag}.jsonl"), os.path.join(out_dir, f"run_meta_{tag}.json"))
 
 
 def load_gold(path=DATA_PATH):

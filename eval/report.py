@@ -1,5 +1,5 @@
-"""Build eval/results.md from eval/predictions_t0.jsonl, eval/judge_results.jsonl, the run metadata and,
-if present, the missing-field set (eval/predictions_missing5.jsonl, eval/run_meta_missing5.json).
+"""Build eval/results.md from eval/runs/2026-10-02/predictions_t0.jsonl, judge_results.jsonl, the run metadata and,
+if present, the missing-field set (predictions_missing5.jsonl, run_meta_missing5.json in the same folder).
 
 No API calls.  Usage:  python eval/report.py [--usd-inr 96.06]
 """
@@ -11,8 +11,10 @@ import sys
 
 EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, EVAL_DIR)
+from paths import BASELINE_RUN, read_dir  # noqa: E402
 from scoring import FIELDS, JUDGED_FIELDS, overall, score_exact, score_not_found, summarize_verdicts  # noqa: E402
 
+RUN_DIR = read_dir(BASELINE_RUN)
 ITER4_URL = "https://github.com/Retro099/jp-meeting-to-crm-fields/blob/ed59caf/eval/results.md"
 
 # AICredits bills the upstream (OpenRouter) rate, converted to INR with a 5% forex buffer + 5% platform fee.
@@ -22,12 +24,12 @@ FEES = 1.05 * 1.05
 
 
 def load_jsonl(name):
-    with open(os.path.join(EVAL_DIR, name), encoding="utf-8") as f:
+    with open(os.path.join(RUN_DIR, name), encoding="utf-8") as f:
         return [json.loads(line) for line in f if line.strip()]
 
 
 def load_json(name):
-    with open(os.path.join(EVAL_DIR, name), encoding="utf-8") as f:
+    with open(os.path.join(RUN_DIR, name), encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -87,7 +89,7 @@ def build(usd_inr):
             ""]
 
     m5_rows, m5meta = None, None
-    if os.path.exists(os.path.join(EVAL_DIR, "predictions_missing5.jsonl")):
+    if os.path.exists(os.path.join(RUN_DIR, "predictions_missing5.jsonl")):
         m5_rows = load_jsonl("predictions_missing5.jsonl")
         m5meta = load_json("run_meta_missing5.json")
         m5_scores = score_exact((r["expected"], r["predicted"]) for r in m5_rows)

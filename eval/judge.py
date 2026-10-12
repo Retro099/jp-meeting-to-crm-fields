@@ -1,11 +1,11 @@
-"""LLM-as-judge (semantic) scoring for 次アクション and リスク on eval/predictions_t0.jsonl.
+"""LLM-as-judge (semantic) scoring for 次アクション and リスク on eval/runs/2026-10-02/predictions_t0.jsonl.
 
 Same model as the extractor, temperature 0, JSON output {verdict: match|partial|miss, reason}.
 Scores: match=1, partial=0.5, miss=0; the strict count uses match only.
 Limitation: the judge is the same model family as the extractor (self-judging bias).
 
 Usage (key via the environment only):  python eval/judge.py
-Writes eval/judge_results.jsonl and eval/judge_meta.json.
+Writes judge_results.jsonl and judge_meta.json next to it.
 """
 
 import json
@@ -19,14 +19,18 @@ from openai import OpenAI
 EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(EVAL_DIR, ".."))
 sys.path.insert(0, EVAL_DIR)
-from crm_extractor.prompts import API_BASE_URL, MODEL_NAME  # noqa: E402
 from scoring import JUDGED_FIELDS, exact_match, parse_verdict, summarize_verdicts  # noqa: E402
 
+from crm_extractor.prompts import API_BASE_URL, MODEL_NAME  # noqa: E402
+
 JUDGE_TEMPERATURE = 0
+from paths import BASELINE_RUN, read_dir  # noqa: E402
+
+RUN_DIR = read_dir(BASELINE_RUN)
 PROMPT_PATH = os.path.join(EVAL_DIR, "judge_prompt.txt")
-PRED_PATH = os.path.join(EVAL_DIR, "predictions_t0.jsonl")
-OUT_PATH = os.path.join(EVAL_DIR, "judge_results.jsonl")
-META_PATH = os.path.join(EVAL_DIR, "judge_meta.json")
+PRED_PATH = os.path.join(RUN_DIR, "predictions_t0.jsonl")
+OUT_PATH = os.path.join(RUN_DIR, "judge_results.jsonl")
+META_PATH = os.path.join(RUN_DIR, "judge_meta.json")
 
 
 def load_prompt(path=PROMPT_PATH):
