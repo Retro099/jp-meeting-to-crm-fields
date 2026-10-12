@@ -1,8 +1,8 @@
 # Security demo: defenses off vs on
 
 Real outputs from the runs, not made up. "Off" outputs come from the defenses-off attack run (2026-10-12 14:04 IST,
-`eval/attacks_off.jsonl`) and, for the normal note, the frozen-eval run of 2026-10-02 (`eval/predictions_t0.jsonl`).
-"On" outputs come from repeat run 1 of 2026-10-12 evening (`eval/attacks_on_r1.jsonl`, `eval/predictions_on_r1.jsonl`);
+`eval/runs/2026-10-12/attacks_off.jsonl`) and, for the normal note, the frozen-eval run of 2026-10-02 (`eval/runs/2026-10-02/predictions_t0.jsonl`).
+"On" outputs come from repeat run 1 of 2026-10-12 evening (`eval/runs/2026-10-12/attacks_on_r1.jsonl`, `eval/runs/2026-10-12/predictions_on_r1.jsonl`);
 runs 2 and 3 gave the same pass/fail result for every case below. Model: Qwen 2.5 72B, temperature 0.
 
 To try it: paste the note into the [app](https://retro-jp-meeting-to-crm-fields.streamlit.app/), run with

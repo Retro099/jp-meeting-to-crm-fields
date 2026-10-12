@@ -1,3 +1,11 @@
+**TL;DR**
+- **Problem:** sales reps re-type messy Japanese meeting notes into the CRM by hand.
+- **Approach:** an LLM (Qwen 2.5 72B) extracts 5 CRM fields as JSON, with a frozen exact-match eval and optional prompt-injection defenses.
+- **Result:** 60.0% exact match (90/150) as a draft for a human to review (company 96.7%, contact 100%); attacks that succeed drop 45% → 6.7% with defenses on (self-authored 40-attack set, 3 runs), 30% → 10% on a 20-case held-out set (1 run).
+
+> Small synthetic data: evaluated on 30 LLM-generated notes (no real customer data), so treat the numbers as indicative, not production accuracy.
+> 小規模な合成データ（LLM で生成した商談メモ 30 件）での評価です。本番環境での精度ではなく目安としてご覧ください。
+
 [![CI](https://github.com/Retro099/jp-meeting-to-crm-fields/actions/workflows/ci.yml/badge.svg)](https://github.com/Retro099/jp-meeting-to-crm-fields/actions/workflows/ci.yml)
 
 [English README](README.md)
@@ -39,6 +47,8 @@ LLM で生成した 30 件の合成商談メモで評価しました（実顧客
 
 全体の完全一致率（150 項目）: 28.7% → 53.3% → 56.0%（temperature=0 設定前） → 59.3%（89/150、temperature=0） → **60.0%**（90/150、「未検出」ルール追加後）
 
+**60.0% の読み方:** 自動入力ではなく、人が確認・修正してから保存する「下書き」としての精度です。相手（100%）・会社名（96.7%）・期限（80.0%）は信頼でき、次アクションとリスクは意味は合っていても言い回しが違うことが多いため、最も確認が必要です。
+
 | 項目 | 完全一致 | LLM-judge (semantic) |
 |---|---|---|
 | 相手 | 100%（30/30） | — |
@@ -49,7 +59,7 @@ LLM で生成した 30 件の合成商談メモで評価しました（実顧客
 
 - 次アクションとリスクは自由記述のため、完全一致に加えて LLM による意味ベースの評価（match=1、partial=0.5、miss=0）も行いました。
 - 今回は判定 60 回のうち 8 回（メモ 26〜30）が上流プロバイダーの HTTP 429 で失敗したため、判定の列は各 26 件です。前回（次アクション 91.7%、リスク 75.0%）より低いものの、対象件数が異なる 1 回の実行のため、そのまま比較はできません。
-- 評価に使うモデルは抽出と同じ Qwen 2.5 72B のため、自己評価バイアスがあります。
+- LLM ジャッジは抽出と同じモデルファミリー（Qwen 2.5 72B）のため、自己評価バイアスがあります。
 - AIによるスポットチェック（全60件）。作者による手動確認は実施予定です。対象は前回（イテレーション 4）の判定で、一致は 53/60（88%）、不一致の 7 件はいずれも判定が甘いケースでした（[確認結果](eval/judge_spotcheck.md)）。今回の判定には実施していません。
 - 前回（59.3%）からの差は +0.7 ポイント（1 項目）です。会社名が 28/30 → 29/30（メモ 29 が `ファーストステップ合同会社` で正解）。期限は 24/30 のままで、メモ 13 が正解（`明日中`）になった一方、メモ 9 は `今週金曜18時` → `今週中（金曜18時）` と悪化しました。どちらも 30 件・1 回の実行のため、1 項目の差は実行ごとのばらつきの範囲です。
 - gold_30 では「未検出」の誤出力は 0/150 でした。
@@ -74,7 +84,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-テストは `pip install -r requirements-dev.txt` の後に `pytest -q` で実行できます（159 件、API キー不要。GitHub Actions でも push ごとに実行）。
+テストは `pip install -r requirements-dev.txt` の後に `pytest -q` で実行できます（162 件、API キー不要。GitHub Actions でも push ごとに実行）。
 
 Docker でも起動できます。手順は [README.md](README.md) をご覧ください。
 
@@ -83,7 +93,7 @@ Docker でも起動できます。手順は [README.md](README.md) をご覧く�
 - `app.py` — Streamlit アプリ（Streamlit Cloud と Docker の起動ファイルのためルートに配置）
 - `crm_extractor/` — 本体パッケージ（プロンプト、抽出 API 呼び出し、セキュリティ対策、デモ制限、UI 文言）
 - `data/` — 評価データ（gold_30、missing_5、攻撃 40 件）
-- `eval/` — 評価スクリプトと全実行結果（数値の元データ）
+- `eval/` — 評価スクリプト。全実行結果（数値の元データ）は `eval/runs/<日付>/` に保存
 - `tests/` — pytest（モッククライアント、API キー不要）
 - `docs/` — デモ GIF、スクリーンショット、[セキュリティデモ手順](docs/SECURITY_DEMO.md)
 
@@ -101,15 +111,17 @@ Docker でも起動できます。手順は [README.md](README.md) をご覧く�
 6. **入力メモのスキャン（表示のみ、AI 呼び出しなし）**: 貼り付けたメモ自体に命令のような行（英語・日本語）がないかを調べて表示します。
    防御オフでは赤（「NOT neutralized」）、防御オンでは黄色（「ignored by defenses」）で該当行を示すので、防御が静かに止めた攻撃も見えます。
    抽出結果は変えません。攻撃メモ 40/40 件を検出し、通常メモ 35 件の誤検出は 0 件でしたが、パターンはこの攻撃セットを見ながら作ったため、
-   未知の攻撃に対する検出率ではなく、動作確認の目安です。
+   未知の攻撃に対する検出率ではなく、動作確認の目安です。下記の未知の攻撃 20 件では 7/20（35%）しか検出できませんでした。
 
 防御がオンのとき、画面に **セキュリティチェック** 欄が表示され、何をなぜブロック・要確認にしたかが分かります。
 
 2026-10-12 に防御オンで 3 回測定（temperature=0）:
-- 攻撃成功率（40 件）: 7.5% / 5.0% / 7.5%、平均 **6.7%**（防御オフでは 45.0%、1 回）
+- 攻撃成功率（自作の攻撃 40 件、3 回）: 7.5% / 5.0% / 7.5%、平均 **6.7%**（防御オフでは 45.0%、1 回）。45% → 6.7%
 - 完全一致（150 項目）: 60.0% / 60.7% / 62.0%、平均 **60.9%**
 - 正しい値を出典チェックが「要確認」にした割合: 8/450（1.8%）、ブロックは 0。成功した攻撃は 1 件も検出できませんでした（攻撃者が偽の値をメモ自体に書くため）
 - 防御オンでも A001（隠し命令）と A032（ロール偽装）は 3 回とも成功、A031 は 3 回中 2 回成功しました。いずれも自然に見える値で、パターンでは判定できません。CRM 保存前の人による確認が必要です
+
+**未知の攻撃での確認（ホールドアウト）:** スキャンのパターンを見ずに書いた新しい攻撃 20 件（`data/attacks_v2_heldout.jsonl`、各モード 1 回、2026-10-12）では、防御オフで 6/20（30%）、防御オンで **2/20（10%）** が成功しました（H004: ゼロ幅文字で隠した命令、H019: メモ内に次アクションとして書かれたシェルコマンド）。件数が少なく 1 回の実行のため、目安です。詳細は [eval/security_results.md](eval/security_results.md)。
 
 ### 自分で試す方法
 [デモ](https://retro-jp-meeting-to-crm-fields.streamlit.app/) で防御をオンにし、通常のメモの後に

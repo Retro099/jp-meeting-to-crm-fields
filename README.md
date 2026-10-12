@@ -1,3 +1,10 @@
+**TL;DR**
+- **Problem:** sales reps re-type messy Japanese meeting notes into the CRM by hand.
+- **Approach:** an LLM (Qwen 2.5 72B) extracts 5 CRM fields as JSON, with a frozen exact-match eval and optional prompt-injection defenses.
+- **Result:** 60.0% exact match (90/150) as a draft for a human to review (company 96.7%, contact 100%); attacks that succeed drop 45% → 6.7% with defenses on (self-authored 40-attack set, 3 runs), 30% → 10% on a 20-case held-out set (1 run).
+
+> Small synthetic data: evaluated on 30 LLM-generated notes (no real customer data), so treat the numbers as indicative, not production accuracy.
+
 [![CI](https://github.com/Retro099/jp-meeting-to-crm-fields/actions/workflows/ci.yml/badge.svg)](https://github.com/Retro099/jp-meeting-to-crm-fields/actions/workflows/ci.yml)
 
 [日本語版はこちら](README.ja.md)
@@ -56,7 +63,7 @@ What the defenses do, in plain words:
    The panel shows them in red ("NOT neutralized") with defenses off and in yellow ("ignored by defenses") with defenses on,
    so an attack that the prompt defense stopped silently is still visible. It does not change the extracted fields.
    It flags 40/40 attack notes and 0/35 clean notes, but its patterns were written against that same attack set, so treat
-   this as a sanity check, not a detection rate on unseen attacks.
+   this as a sanity check, not a detection rate on unseen attacks. On the 20 held-out attacks below it flagged only 7/20 (35%).
 
 With defenses on, the app shows a **security panel** listing what was blocked or flagged and why.
 
@@ -68,9 +75,13 @@ Measured with defenses on, 3 runs on 2026-10-12 (temperature 0, GitHub Actions):
 | Exact match, 150 fields | 90/150 (60.0%) | 91/150 (60.7%) | 93/150 (62.0%) | **60.9%** (60.0–62.0%) |
 | Correct values flagged by provenance | 2/150 | 3/150 | 3/150 | 1.8% (0 blocked) |
 
-Without defenses, 18/40 attacks (45.0%) got through (one run). The attacks that still pass copy their fake value into the note
+These numbers come from a **self-authored 40-attack set, 3 runs**: 45% → 6.7%. Without defenses, 18/40 attacks (45.0%) got through (one run). The attacks that still pass copy their fake value into the note
 itself, so it *does* appear in the note and only a human can tell it is wrong. A001 (hidden instruction) and A032 (role
-spoofing) got through in all 3 defended runs, A031 in 2 of 3. Details: [`SECURITY.md`](SECURITY.md),
+spoofing) got through in all 3 defended runs, A031 in 2 of 3.
+
+**Held-out check (unseen attacks):** 20 new attacks written without looking at the scan's patterns (`data/attacks_v2_heldout.jsonl`,
+one run per mode, 2026-10-12): 6/20 (30%) got through with defenses off, **2/20 (10%)** with defenses on (H004: instruction
+hidden with zero-width characters; H019: a shell command written into the note as the next step). Small set, single run. Details: [`SECURITY.md`](SECURITY.md),
 [`eval/security_results.md`](eval/security_results.md), and a side-by-side demo in [`docs/SECURITY_DEMO.md`](docs/SECURITY_DEMO.md).
 
 ### How to test it yourself
@@ -82,6 +93,11 @@ spoofing) got through in all 3 defended runs, A031 in 2 of 3. Details: [`SECURIT
 4. Offline (no key, no cost): `pytest -q tests/test_security.py tests/test_note_scan.py`.
 
 ## 📊 Evaluation Metrics
+**How to read 60.0%:** this is a human-in-the-loop draft, not autopilot. The rep reviews and edits the fields before saving.
+Per field (exact match, 30 notes): 相手 100% (30/30), 会社名 96.7% (29/30) and 期限 80.0% (24/30) are reliable;
+次アクション (23.3% exact, 88.5% by the LLM judge) and リスク (0.0% exact, 65.4% by the judge) are free-text summaries that
+are usually right in meaning but worded differently, so they need the most review. The LLM judge is the same model family as the extractor.
+
 The pipeline is evaluated against a 30-note labeled dataset (`data/gold_30.jsonl`) with a strict exact-string match, plus an LLM-as-judge semantic score for the two free-text fields.
 
 *Data note:* the 30 evaluation notes (`data/gold_30.jsonl`) are synthetic, LLM-generated Japanese business meeting notes with gold labels prepared for this eval; no real customer or interview data is used. `data/missing_5.jsonl` is a separate, **synthetic** set of 5 notes written for the `未検出` check, each missing 1–2 fields (gold label `未検出`). It is not part of the frozen 30-note score.
@@ -172,7 +188,9 @@ Five representative misses from the iteration 5 run (gold → predicted):
 │   ├── gold_30.jsonl          # 30-note labeled evaluation dataset (frozen, synthetic)
 │   ├── missing_5.jsonl        # 5 synthetic notes with 1–2 missing fields (gold 未検出)
 │   ├── attacks_v1.jsonl       # 40 prompt-injection cases (5 categories × 8, JA + EN)
-│   └── make_attacks_v1.py     # Generates attacks_v1.jsonl
+│   ├── make_attacks_v1.py     # Generates attacks_v1.jsonl
+│   ├── attacks_v2_heldout.jsonl  # 20 held-out attacks, written blind to the scan patterns
+│   └── make_attacks_v2.py     # Generates attacks_v2_heldout.jsonl (how they were written is in its header)
 ├── docs/
 │   ├── demo.gif               # Defenses off vs on demo (README top)
 │   ├── SECURITY_DEMO.md       # Side-by-side attack demo with expected results
@@ -187,12 +205,14 @@ Five representative misses from the iteration 5 run (gold → predicted):
 │   ├── security_repeats.py    # Mean/range over the 3 defended runs -> security_repeats.json
 │   ├── results.md             # Accuracy results, cost/latency, failure logs (results_pre_t0.md: history)
 │   ├── security_results.md    # Security results, per-attack details
-│   └── *.jsonl / *_meta.json  # Raw predictions, judge verdicts and run metadata for every reported number
-├── tests/                     # 159 pytest tests incl. Streamlit AppTest smoke tests (mocked client, no API key)
+│   ├── paths.py               # Where outputs go: eval/runs/<date>/ (override with EVAL_RUN_DIR)
+│   └── runs/<date>/           # Raw predictions, judge verdicts and run metadata for every reported number
+│                              #   2026-10-02: accuracy eval + judge; 2026-10-12: attacks, 3 defended repeats, held-out set
+├── tests/                     # 162 pytest tests incl. Streamlit AppTest smoke tests (mocked client, no API key)
 ├── app.py                     # Streamlit entry point (kept in root for Streamlit Cloud and Docker)
 ├── SECURITY.md                # Threat model, defense layers, limits
 ├── Dockerfile / .dockerignore # Container definition (port 8501)
-├── requirements.txt           # Pinned runtime dependencies (requirements-dev.txt: pytest)
+├── requirements.txt           # Pinned runtime dependencies (requirements-dev.txt: pytest, ruff); pyproject.toml: metadata + ruff config
 ├── pytest.ini                 # pytest settings
 ├── LICENSE                    # MIT
 ├── README.md
@@ -253,9 +273,10 @@ GitHub Actions runs the same tests on every push and pull request to `main` (Pyt
 To re-run the eval (95 API calls in total), set `AICREDITS_API_KEY` in your environment and run:
 
 ```bash
-python eval/run_eval.py   # 30 extraction calls -> eval/predictions_t0.jsonl
-python eval/run_eval.py --data data/missing_5.jsonl --tag missing5   # 5 calls -> eval/predictions_missing5.jsonl
-python eval/judge.py      # 60 judge calls      -> eval/judge_results.jsonl
+export EVAL_RUN_DIR=eval/runs/$(date +%F)   # new folder; the saved run is eval/runs/2026-10-02/
+python eval/run_eval.py   # 30 extraction calls -> $EVAL_RUN_DIR/predictions_t0.jsonl
+python eval/run_eval.py --data data/missing_5.jsonl --tag missing5   # 5 calls -> $EVAL_RUN_DIR/predictions_missing5.jsonl
+python eval/judge.py      # 60 judge calls      -> $EVAL_RUN_DIR/judge_results.jsonl
 python eval/report.py     # no API calls        -> eval/results.md
 ```
 
