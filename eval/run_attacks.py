@@ -27,12 +27,13 @@ DATA = os.path.join(EVAL_DIR, "..", "data", "attacks_v1.jsonl")
 CANARY = "CANARY-7f3a9c2e51d84b60"  # test-only marker, not a real secret
 
 
-def main(mode, max_calls):
+def main(mode, max_calls, tag=None):
+    tag = tag or mode
     load_dotenv()
     cases = [json.loads(l) for l in open(DATA, encoding="utf-8") if l.strip()]
     if len(cases) > max_calls:
         sys.exit(f"{len(cases)} calls planned, over the limit {max_calls}")
-    client = OpenAI(api_key=os.getenv("AICREDITS_API_KEY"), base_url=API_BASE_URL, timeout=90, max_retries=1)
+    client = OpenAI(api_key=os.getenv("AICREDITS_API_KEY"), base_url=API_BASE_URL, timeout=90, max_retries=int(os.getenv("OPENAI_MAX_RETRIES", "1")))
     rows = []
     for c in cases:
         r = extract_crm_data(client, c["input"], defenses=(mode == "on"), canary=CANARY)
@@ -41,14 +42,14 @@ def main(mode, max_calls):
                      "error": r.get("error"), "data": r.get("data"), "security": r.get("security")})
         print(c["id"], c["category"], "SUCCESS" if rows[-1]["attack_success"] else "blocked/failed")
         time.sleep(1)
-    with open(os.path.join(EVAL_DIR, f"attacks_{mode}.jsonl"), "w", encoding="utf-8") as f:
+    with open(os.path.join(EVAL_DIR, f"attacks_{tag}.jsonl"), "w", encoding="utf-8") as f:
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
     summary = {"mode": mode, "model": MODEL_NAME, "temperature": TEMPERATURE, "dataset": "data/attacks_v1.jsonl",
                "api_calls": len(rows), "failed_calls": sum(not r["success"] for r in rows),
                "run_date_ist": datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30))).isoformat(timespec="minutes"),
                "asr": asr_by_category(rows)}
-    with open(os.path.join(EVAL_DIR, f"attacks_{mode}_meta.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(EVAL_DIR, f"attacks_{tag}_meta.json"), "w", encoding="utf-8") as f:
         json.dump(summary, f, ensure_ascii=False, indent=2)
     print(json.dumps(summary["asr"], ensure_ascii=False))
 
@@ -57,5 +58,6 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--mode", choices=["off", "on"], required=True)
     ap.add_argument("--max-calls", type=int, default=int(os.getenv("MAX_API_CALLS", "50")))
+    ap.add_argument("--tag", default=None, help="output suffix (default: the mode)")
     a = ap.parse_args()
-    main(a.mode, a.max_calls)
+    main(a.mode, a.max_calls, a.tag)

@@ -85,7 +85,7 @@ def extract_crm_data(client, text, defenses=None, canary=None):
         raw = parse_json_object(content)
         extra = {}
         if defenses:
-            data, report = security.harden_output(content, raw, canary)
+            data, report = security.harden_output(content, raw, canary, note=text)
             raw = dict(data)  # never show unvalidated model output downstream
             extra["security"] = report
         else:

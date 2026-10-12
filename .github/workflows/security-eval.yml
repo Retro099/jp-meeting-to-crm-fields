@@ -1,0 +1,70 @@
+name: Security eval (manual, uses API credits)
+
+# Manual only: defenses ON, N repeats of gold_30 (30 calls) + attacks_v1 (40 calls). No judge calls.
+# No automatic retries (OPENAI_MAX_RETRIES=0), so every API request is counted exactly once.
+# Also runs on a push to the branch run/security-eval (so it can be started before this file is on main).
+on:
+  push:
+    branches: [run/security-eval]
+  workflow_dispatch:
+    inputs:
+      repeats:
+        description: "How many repeats (each = 70 API calls)"
+        default: "3"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval
+  cancel-in-progress: false
+
+jobs:
+  security-eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      MAX_API_CALLS: "220"
+      DEFENSES_ENABLED: "1"
+      OPENAI_MAX_RETRIES: "0"
+      REPEATS: ${{ inputs.repeats || '3' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Budget guard (planned API calls)
+        run: |
+          notes=$(grep -c . data/gold_30.jsonl); attacks=$(grep -c . data/attacks_v1.jsonl)
+          planned=$(( (notes + attacks) * REPEATS ))
+          echo "Planned API calls: $planned (limit $MAX_API_CALLS)"
+          if [ "$planned" -gt "$MAX_API_CALLS" ]; then echo "Over budget, stopping."; exit 1; fi
+      - name: Run repeats (defenses on, temperature=0)
+        env:
+          AICREDITS_API_KEY: ${{ secrets.AICREDITS_API_KEY }}
+        run: |
+          for i in $(seq 1 "$REPEATS"); do
+            python eval/run_eval.py --tag "on_r$i"
+            python eval/run_attacks.py --mode on --tag "on_r$i" --max-calls 40
+          done
+      - name: Summarize (no API calls)
+        run: python eval/security_repeats.py
+      - name: Check outputs contain no secret
+        env:
+          AICREDITS_API_KEY: ${{ secrets.AICREDITS_API_KEY }}
+        run: |
+          if grep -rqF -- "$AICREDITS_API_KEY" eval/; then echo "Secret found in outputs, not uploading."; exit 1; fi
+          echo "No secret in outputs."
+      - uses: actions/upload-artifact@v7
+        with:
+          name: security-eval-outputs
+          path: |
+            eval/predictions_on_r*.jsonl
+            eval/run_meta_on_r*.json
+            eval/attacks_on_r*.jsonl
+            eval/attacks_on_r*_meta.json
+            eval/security_repeats.json
+          if-no-files-found: error

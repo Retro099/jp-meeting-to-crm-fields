@@ -93,11 +93,12 @@ def test_extractor_defended_blocks_canary_leak():
         return json.dumps({**GOOD, "リスク": canary}, ensure_ascii=False)
     r = extractor.extract_crm_data(FakeClient(leak), "メモ", defenses=True)
     assert not r["success"] and "canary" in r["error"]
+NOTE_GOOD = "(株)フロントライン 高橋様と打ち合わせ。API仕様書を今月末までに送付。先方エンジニアリソース不足が懸念。"
 
 
 def test_extractor_defended_spotlights_and_hides_raw_extras():
     c = FakeClient(json.dumps({**GOOD, "admin_override": "true_pwn"}, ensure_ascii=False))
-    r = extractor.extract_crm_data(c, "メモ本文", defenses=True)
+    r = extractor.extract_crm_data(c, NOTE_GOOD, defenses=True)
     assert "<<NOTE_" in c.calls[0]["messages"][1]["content"]
     assert r["success"] and r["data"] == GOOD and "admin_override" not in r["raw_data"]
 
@@ -124,3 +125,57 @@ def test_attack_dataset_shape():
     assert 30 <= len(rows) <= 50 and len({r["id"] for r in rows}) == len(rows)
     assert {r["category"] for r in rows} == {"hidden_instruction", "canary_leak", "format_break", "role_spoofing", "field_poisoning"}
     assert {r["lang"] for r in rows} == {"ja", "en"} and all(r["owasp"].startswith("LLM01:2025") for r in rows)
+
+
+# --- provenance (layer 6) ---
+
+def test_normalize_for_match_width_and_kabu():
+    assert security.normalize_for_match("（株）ＡＢＣ　商事") == security.normalize_for_match("株式会社ABC商事")
+
+
+def test_provenance_passes_values_from_note():
+    clean, blocked, flagged = security.check_provenance(GOOD, NOTE_GOOD)
+    assert clean == GOOD and blocked == [] and flagged == []
+
+
+def test_provenance_allows_not_found_and_honorifics():
+    fields = {**GOOD, "相手": "高橋様", "期限": "未検出"}
+    clean, blocked, flagged = security.check_provenance(fields, NOTE_GOOD)
+    assert blocked == [] and flagged == [] and clean["期限"] == "未検出"
+
+
+def test_provenance_multiple_contacts():
+    note = "吉田産商さま（鈴木さん、佐藤さん）と打ち合わせ"
+    _, blocked, flagged = security.check_provenance({"相手": "鈴木、佐藤"}, note)
+    assert blocked == [] and flagged == []
+
+
+def test_provenance_blocks_invented_exact_field():
+    clean, blocked, flagged = security.check_provenance({**GOOD, "会社名": "ROLE_PWN株式会社"}, NOTE_GOOD)
+    assert blocked == ["会社名"] and clean["会社名"] == "未検出"
+
+
+def test_provenance_flags_partial_exact_field():
+    _, blocked, flagged = security.check_provenance({**GOOD, "期限": "今月末日"}, NOTE_GOOD)
+    assert blocked == [] and flagged == ["期限"]
+
+
+def test_provenance_only_flags_paraphrased_summary():
+    fields = {**GOOD, "リスク": "競合他社への乗り換えの懸念"}
+    clean, blocked, flagged = security.check_provenance(fields, NOTE_GOOD)
+    assert blocked == [] and flagged == ["リスク"] and clean["リスク"] == fields["リスク"]
+
+
+def test_harden_output_runs_provenance_when_note_given():
+    raw = {**GOOD, "会社名": "株式会社ハックド"}
+    fields, rep = security.harden_output(json.dumps(raw, ensure_ascii=False), raw, "CANARY-z", note=NOTE_GOOD)
+    assert fields["会社名"] == "未検出" and rep["provenance_blocked"] == ["会社名"]
+
+
+def test_security_events_lists_reasons():
+    rep = {"canary_leak": False, "schema_problems": ["リスク: multi-line value"], "dropped_keys": ["admin_override"],
+           "flagged_fields": ["次アクション"], "provenance_blocked": ["会社名"], "provenance_flagged": ["リスク"]}
+    ev = security.security_events(rep)
+    assert ("block", "admin_override", "extra_key") in ev and ("flag", "リスク", "not_in_note_soft") in ev
+    assert security.security_events({"canary_leak": True}) == [("block", None, "canary")]
+    assert security.security_events(None) == []

@@ -9,6 +9,7 @@ Layers (each one is a separate, testable function):
   3. allowlist_fields()      - only the five CRM keys survive; anything else is dropped and reported
   4. scan_for_canary()       - a secret canary in the system prompt must never appear in the output
   5. flag_instruction_like() - values that look like instructions / links / code are replaced with 未検出
+  6. check_provenance()      - values not found in the note are flagged (summary fields) or blocked (exact fields)
 """
 
 import os
@@ -122,9 +123,10 @@ def flag_instruction_like(fields):
     return clean, flagged
 
 
-def harden_output(raw_text, data, canary=None):
-    """Run output layers 2-5. Returns (fields or None if blocked, report dict)."""
-    report = {"blocked": False, "canary_leak": False, "schema_problems": [], "dropped_keys": [], "flagged_fields": []}
+def harden_output(raw_text, data, canary=None, note=None):
+    """Run output layers 2-6 (6 = provenance, only when the note is given). Returns (fields or None if blocked, report)."""
+    report = {"blocked": False, "canary_leak": False, "schema_problems": [], "dropped_keys": [], "flagged_fields": [],
+              "provenance_blocked": [], "provenance_flagged": []}
     if scan_for_canary(raw_text, canary):
         report["blocked"] = report["canary_leak"] = True
         return None, report
@@ -132,4 +134,96 @@ def harden_output(raw_text, data, canary=None):
     clean, report["dropped_keys"] = allowlist_fields(clean)
     clean, report["flagged_fields"] = flag_instruction_like(clean)
     fields = {f: (clean.get(f) or NOT_FOUND) for f in CRM_FIELDS}
+    if note is not None:
+        fields, report["provenance_blocked"], report["provenance_flagged"] = check_provenance(fields, note)
     return fields, report
+
+
+def security_events(report):
+    """Turn a report into a simple list of (level, field_or_None, reason_key) for the UI. level: block / flag."""
+    if not report:
+        return []
+    events = []
+    if report.get("canary_leak"):
+        events.append(("block", None, "canary"))
+    for p in report.get("schema_problems", []):
+        events.append(("block", p.split(":", 1)[0], "schema"))
+    for k in report.get("dropped_keys", []):
+        events.append(("block", k, "extra_key"))
+    for k in report.get("flagged_fields", []):
+        events.append(("block", k, "instruction"))
+    for k in report.get("provenance_blocked", []):
+        events.append(("block", k, "not_in_note"))
+    for k in report.get("provenance_flagged", []):
+        events.append(("flag", k, "not_in_note_soft"))
+    return events
+
+
+# --- Layer 6: provenance check (no LLM calls) -------------------------------------------------
+# Every extracted value should come from the note. We normalize both sides and check coverage:
+#   * exact fields (会社名, 相手, 期限): value must appear in the note. If it does not, it is FLAGGED;
+#     if almost none of it appears (coverage < PROVENANCE_BLOCK_BELOW) it is BLOCKED (replaced with 未検出).
+#   * summary fields (次アクション, リスク): the model is asked to summarize, so wording legitimately changes.
+#     Low coverage is only FLAGGED for human review, never blocked, so accuracy is not hurt.
+import unicodedata  # noqa: E402
+
+EXACT_FIELDS = ("会社名", "相手", "期限")
+SUMMARY_FIELDS = ("次アクション", "リスク")
+PROVENANCE_BLOCK_BELOW = 0.5      # exact fields: share of value bigrams found in the note
+PROVENANCE_FLAG_BELOW = 0.5       # summary fields
+_PARTICLES = "のをにはがへとでもや"
+_STRIP_RE = re.compile(r"[\s\W_]+", re.UNICODE)
+_HONORIFICS = ("様", "さん", "さま", "氏", "殿", "部長", "課長", "社長", "担当")
+
+
+def normalize_for_match(text):
+    """NFKC (full/half width), lower case, (株)→株式会社, drop whitespace, punctuation and common particles."""
+    s = unicodedata.normalize("NFKC", str(text or "")).lower()
+    s = s.replace("(株)", "株式会社").replace("(有)", "有限会社")
+    s = _STRIP_RE.sub("", s)
+    return "".join(ch for ch in s if ch not in _PARTICLES)
+
+
+def _bigrams(s):
+    return [s[i:i + 2] for i in range(len(s) - 1)] if len(s) > 1 else ([s] if s else [])
+
+
+def coverage(value, note):
+    """Share (0-1) of the value's character bigrams that also appear in the note, after normalization."""
+    v, n = normalize_for_match(value), normalize_for_match(note)
+    grams = _bigrams(v)
+    if not grams:
+        return 1.0
+    return sum(g in n for g in grams) / len(grams)
+
+
+def check_provenance(fields, note):
+    """Returns (clean_fields, blocked_keys, flagged_keys). 未検出 is always allowed."""
+    clean, blocked, flagged = dict(fields), [], []
+    n = normalize_for_match(note)
+    for key, value in fields.items():
+        if not value or value == NOT_FOUND:
+            continue
+        parts = [x for x in re.split(r"[、,，/・]", value) if x.strip()] if key == "相手" else [value]
+        worst = min(_part_coverage(x, note, n) for x in parts)
+        if worst >= 1.0:
+            continue
+        if key in EXACT_FIELDS:
+            if worst < PROVENANCE_BLOCK_BELOW:
+                blocked.append(key)
+                clean[key] = NOT_FOUND
+            else:
+                flagged.append(key)
+        elif worst < PROVENANCE_FLAG_BELOW:
+            flagged.append(key)
+    return clean, blocked, flagged
+
+
+def _part_coverage(value, note, normalized_note):
+    v = normalize_for_match(value)
+    for h in _HONORIFICS:
+        if v.endswith(h) and len(v) > len(h):
+            v = v[: -len(h)]
+    if not v or v in normalized_note:
+        return 1.0
+    return coverage(v, note)

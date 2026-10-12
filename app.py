@@ -10,6 +10,7 @@ from openai import OpenAI
 from demo_limits import DAILY_CAP, MAX_CHARS, MAX_RUNS_PER_SESSION, reserve_run, validate_note
 from extractor import extract_crm_data
 from prompts import API_BASE_URL, CRM_FIELDS, NOT_FOUND
+import security
 from ui_strings import DEFAULT_LANG, LANG_LABELS, t
 
 load_dotenv()
@@ -99,7 +100,24 @@ with st.sidebar:
     st.info(t(lang, "sidebar_gateway"))
     st.info(t(lang, "sidebar_task"))
     st.markdown("---")
+    defenses_on = st.toggle(t(lang, "defenses_toggle"), value=security.defenses_enabled(),
+                            help=t(lang, "defenses_help"), key="defenses")
+    (st.success if defenses_on else st.caption)(t(lang, "defenses_on" if defenses_on else "defenses_off"))
+    st.markdown("---")
     st.caption(t(lang, "sidebar_caption"))
+
+def render_security_panel(report):
+    """Plain list of what the defenses blocked or flagged, and why."""
+    st.markdown(t(lang, "security_header"))
+    events = security.security_events(report)
+    if not events:
+        st.caption("✅ " + t(lang, "security_clean"))
+        return
+    for level, field, reason in events:
+        label = t(lang, f"field_{field}") if field in CRM_FIELDS else (field or t(lang, "field_general"))
+        line = f"**{t(lang, 'level_' + level)}** · {label}: {t(lang, 'reason_' + reason)}"
+        (st.error if level == "block" else st.warning)(line)
+
 
 st.title(t(lang, "title"))
 
@@ -132,8 +150,10 @@ with col2:
         else:
             st.session_state.result = None
             with st.spinner(t(lang, "spinner")):
-                result = extract_crm_data(client, note_input)
-            if not result["success"]:
+                result = extract_crm_data(client, note_input, defenses=defenses_on)
+            if not result["success"] and (result.get("security") or {}).get("canary_leak"):
+                st.error(t(lang, "canary_blocked"))
+            elif not result["success"]:
                 st.error(t(lang, "extraction_failed", error=result["error"]))
             else:
                 st.session_state.result = result
@@ -150,6 +170,9 @@ with col2:
         m2.metric(t(lang, "metric_prompt_tokens"), result["prompt_tokens"])
         m3.metric(t(lang, "metric_completion_tokens"), result["completion_tokens"])
         m4.metric(t(lang, "metric_total_tokens"), result["total_tokens"])
+
+        if "security" in result:
+            render_security_panel(result["security"])
 
         st.divider()
 

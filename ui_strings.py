@@ -46,6 +46,22 @@ STRINGS = {
         "session_limit": "このセッションのデモ実行回数（{max_runs} 回）を使い切りました。お試しいただきありがとうございます。"
                          "さらに実行するには、リポジトリをクローンしてご自身の API キーをお使いください。",
         "daily_limit": "本日のデモ実行回数の上限（全利用者共通）に達しました。明日（UTC）以降に再度お試しください。",
+        "defenses_toggle": "🛡️ セキュリティ防御",
+        "defenses_help": "オンにすると、メモに紛れ込んだ命令（プロンプトインジェクション）への対策と、メモにない値のチェックを行います。",
+        "defenses_on": "🛡️ 防御: オン",
+        "defenses_off": "防御: オフ（モデルの出力をそのまま表示）",
+        "security_header": "#### 🛡️ セキュリティチェック",
+        "security_clean": "問題は見つかりませんでした。",
+        "canary_blocked": "🚫 ブロック: 出力に秘密の確認コード（カナリア）が含まれていました。プロンプト漏えいの可能性があるため、結果は表示しません。",
+        "level_block": "ブロック",
+        "level_flag": "要確認",
+        "field_general": "全体",
+        "reason_canary": "秘密の確認コード（カナリア）が出力に含まれていた",
+        "reason_schema": "形式が不正（長すぎる・複数行・入れ子）",
+        "reason_extra_key": "5項目以外のキーなので削除",
+        "reason_instruction": "命令のような値（リンク・コード・「指示を無視」など）",
+        "reason_not_in_note": "メモの中に見つからない値なので「未検出」に置き換え",
+        "reason_not_in_note_soft": "メモの言葉と大きく異なる（要約の可能性あり、内容を確認してください）",
         "missing_key": "**AICREDITS_API_KEY が設定されていません。**\n\n"
                        "- ローカル: リポジトリ直下の `.env` に `AICREDITS_API_KEY=\"your_key\"` を追加してください。\n"
                        "- Docker: `--env-file .env` を付けて起動してください。\n"
@@ -89,6 +105,22 @@ STRINGS = {
         "session_limit": "You've used all {max_runs} demo runs for this session. Thanks for trying it! "
                          "To run more, clone the repo and use your own API key.",
         "daily_limit": "The shared daily demo limit has been reached. Please try again tomorrow (UTC).",
+        "defenses_toggle": "🛡️ Security defenses",
+        "defenses_help": "When on, the app guards against instructions hidden in the note (prompt injection) and checks that every value comes from the note.",
+        "defenses_on": "🛡️ Defenses: ON",
+        "defenses_off": "Defenses: OFF (raw model output is shown)",
+        "security_header": "#### 🛡️ Security check",
+        "security_clean": "No problems found.",
+        "canary_blocked": "🚫 Blocked: the output contained the secret check code (canary). The prompt may have leaked, so no result is shown.",
+        "level_block": "blocked",
+        "level_flag": "check",
+        "field_general": "overall",
+        "reason_canary": "the secret check code (canary) appeared in the output",
+        "reason_schema": "bad format (too long, multi-line or nested)",
+        "reason_extra_key": "not one of the 5 fields, removed",
+        "reason_instruction": "instruction-like value (link, code, 'ignore instructions', ...)",
+        "reason_not_in_note": "value not found in the note, replaced with 未検出",
+        "reason_not_in_note_soft": "wording differs a lot from the note (may be a summary, please check)",
         "missing_key": "**AICREDITS_API_KEY is not set.**\n\n"
                        "- Local: add `AICREDITS_API_KEY=\"your_key\"` to a `.env` file in the repo root.\n"
                        "- Docker: run with `--env-file .env`.\n"

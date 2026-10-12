@@ -38,7 +38,7 @@ def load_gold(path=DATA_PATH):
 
 def run_eval(data_path=DATA_PATH, tag=DEFAULT_TAG):
     load_dotenv()
-    client = OpenAI(api_key=os.getenv("AICREDITS_API_KEY"), base_url=API_BASE_URL, timeout=90, max_retries=1)
+    client = OpenAI(api_key=os.getenv("AICREDITS_API_KEY"), base_url=API_BASE_URL, timeout=90, max_retries=int(os.getenv("OPENAI_MAX_RETRIES", "1")))
     records = load_gold(data_path)
     pred_path, meta_path = output_paths(tag)
     print(f"Starting evaluation of {len(records)} notes using {MODEL_NAME} (temperature={TEMPERATURE})...")
@@ -56,6 +56,7 @@ def run_eval(data_path=DATA_PATH, tag=DEFAULT_TAG):
             "predicted": result.get("data", {}) if result["success"] else {},
             "success": result["success"],
             "error": result.get("error"),
+            "security": result.get("security"),
             "latency_s": result.get("latency"),
             "prompt_tokens": result.get("prompt_tokens"),
             "completion_tokens": result.get("completion_tokens"),
