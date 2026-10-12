@@ -227,3 +227,39 @@ def _part_coverage(value, note, normalized_note):
     if not v or v in normalized_note:
         return 1.0
     return coverage(v, note)
+
+
+# --- Input-side scan (no LLM calls) -----------------------------------------------------------
+# Spotlighting can neutralize an injected instruction silently: the output is clean, so the output
+# checks above find nothing. This scan looks at the raw NOTE so the UI can still say "an instruction
+# was found in the note". It is display-only: it never changes the extracted fields or eval numbers.
+# Patterns = the output patterns above (_INSTRUCTION_PATTERNS) plus note-specific ones (fake role
+# headers, text addressed to "the AI", 「…」と出力 style commands, requests for hidden codes / extra keys).
+_NOTE_ONLY_PATTERNS = [
+    r"(?:^|\n)\s*[\[【(（]?\s*(?:システム|開発者|管理者|system|developer|admin)\s*[\]】)）]?\s*(?:より|から|からの命令)?\s*[:：]",
+    r"開発者(?:より|から)",
+    r"(?:ＡＩ|AI)\s*(?:へ|に|は)|(?:読む|処理する|抽出)\s*(?:ＡＩ|AI|システム)",
+    r"「[^」]{1,40}」と(?:出力|記載|記入|書き込|書|固定|して)",
+    r"(?:欄|キー)に「",
+    r"というキー|新しいキー|キー「",
+    r"内部参照コード|指示文|受け取った指示",
+    r"エクスポートせよ|改行を入れ",
+    r"\b(?:output|respond|reply)\s+(?:your|with|only)\b",
+    r"\b(?:add|insert)\s+a\s+(?:new\s+)?key\b",
+    r"\breplace\s+the\s+(?:deadline|company|contact|risk|value)",
+    r"\b(?:system\s+prompt|your\s+instructions|reference\s+code)\b",
+    r"\bignore\s+the\s+\w+",
+    r"\bset\s+\S+\s+to\b",
+]
+_NOTE_RE = re.compile("|".join(f"(?:{p})" for p in _INSTRUCTION_PATTERNS + _NOTE_ONLY_PATTERNS), re.IGNORECASE)
+SNIPPET_CHARS = 60
+
+
+def scan_note_for_injection(note):
+    """Return the lines of the note that look like instructions to the AI (stripped, max SNIPPET_CHARS each)."""
+    hits = []
+    for line in str(note or "").splitlines():
+        line = line.strip()
+        if line and _NOTE_RE.search(line):
+            hits.append(line if len(line) <= SNIPPET_CHARS else line[:SNIPPET_CHARS] + "…")
+    return hits
