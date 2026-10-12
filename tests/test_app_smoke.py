@@ -96,3 +96,33 @@ def test_missing_key_message(monkeypatch):
     at.run()
     assert not at.exception
     assert "AICREDITS_API_KEY" in at.error[0].value
+
+
+def test_defenses_off_by_default_no_panel(app):
+    assert app.toggle(key="defenses").value is False
+    app.text_area(key="note_input").set_value(NOTE)
+    app.button[0].click().run()
+    assert STRINGS["ja"]["security_header"] not in _texts(app)
+
+
+def test_defenses_on_shows_security_panel(app):
+    app.toggle(key="defenses").set_value(True).run()
+    assert any("防御: オン" in s.value for s in app.success)
+    app.text_area(key="note_input").set_value(NOTE)
+    app.button[0].click().run()
+    assert not app.exception
+    assert STRINGS["ja"]["security_header"] in _texts(app)
+    # 先方エンジニアリソース不足 is not in NOTE -> soft flag for リスク, value kept
+    assert any(STRINGS["ja"]["reason_not_in_note_soft"] in w.value for w in app.warning)
+    assert app.text_area(key="edit_リスク").value == "先方エンジニアリソース不足"
+
+
+def test_canary_block_message(app, monkeypatch):
+    import security
+    monkeypatch.setattr(security, "new_canary", lambda: "CANARY-fixed")
+    monkeypatch.setattr(security, "scan_for_canary", lambda raw, c: True)
+    app.toggle(key="defenses").set_value(True).run()
+    app.text_area(key="note_input").set_value(NOTE)
+    app.button[0].click().run()
+    assert any("カナリア" in e.value for e in app.error)
+    assert app.session_state.result is None
