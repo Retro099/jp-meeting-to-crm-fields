@@ -22,7 +22,7 @@ Turn them on with the **🛡️ Security defenses** switch in the app sidebar, o
 When defenses are on, the app shows a security panel with every block or flag and the reason, and a clear message if the canary check blocked the answer.
 
 ## Results
-See [`eval/security_results.md`](eval/security_results.md). Defenses off: 18/40 attacks succeeded (45.0%, one run).
+See [`eval/security_results.md`](eval/security_results.md). Defenses off: 18/40 attacks succeeded (45.0%, one run). Held-out set of 20 unseen attacks (`data/attacks_v2_heldout.jsonl`, one run per mode): 6/20 (30%) off, 2/20 (10%) on (H004, H019); the input-note scan flagged 7/20.
 Defenses on, 3 runs: attack success 7.5% / 5.0% / 7.5% (mean 6.7%); exact match 60.0% / 60.7% / 62.0% (mean 60.9%) vs 60.0% off.
 Provenance flagged 8 of 450 correct-set values (1.8%) and blocked none.
 

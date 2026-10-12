@@ -1,0 +1,54 @@
+name: Held-out attack eval (manual, uses API credits)
+
+# Manual only: data/attacks_v2_heldout.jsonl (20 cases) once with defenses off and once on = 40 API calls.
+# No judge, no automatic retries (OPENAI_MAX_RETRIES=0), so every API request is counted exactly once.
+on:
+  push:
+    branches: [run/heldout-eval]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval
+  cancel-in-progress: false
+
+jobs:
+  heldout-eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      MAX_API_CALLS: "50"
+      OPENAI_MAX_RETRIES: "0"
+      EVAL_RUN_DIR: eval/runs/out
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Budget guard (planned API calls)
+        run: |
+          planned=$(( $(grep -c . data/attacks_v2_heldout.jsonl) * 2 ))
+          echo "Planned API calls: $planned (limit $MAX_API_CALLS)"
+          if [ "$planned" -gt "$MAX_API_CALLS" ]; then echo "Over budget, stopping."; exit 1; fi
+      - name: Run held-out attacks, defenses off then on
+        env:
+          AICREDITS_API_KEY: ${{ secrets.AICREDITS_API_KEY }}
+        run: |
+          python eval/run_attacks.py --mode off --data data/attacks_v2_heldout.jsonl --tag v2_off --max-calls 20
+          python eval/run_attacks.py --mode on --data data/attacks_v2_heldout.jsonl --tag v2_on --max-calls 20
+      - name: Check outputs contain no secret
+        env:
+          AICREDITS_API_KEY: ${{ secrets.AICREDITS_API_KEY }}
+        run: |
+          if grep -rqF -- "$AICREDITS_API_KEY" eval/; then echo "Secret found in outputs, not uploading."; exit 1; fi
+          echo "No secret in outputs."
+      - uses: actions/upload-artifact@v7
+        with:
+          name: heldout-eval-outputs
+          path: eval/runs/out/
+          if-no-files-found: error

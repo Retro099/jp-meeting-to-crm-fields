@@ -7,10 +7,10 @@ import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from crm_extractor import security
 from crm_extractor.demo_limits import DAILY_CAP, MAX_CHARS, MAX_RUNS_PER_SESSION, reserve_run, validate_note
 from crm_extractor.extractor import extract_crm_data
 from crm_extractor.prompts import API_BASE_URL, CRM_FIELDS, NOT_FOUND
-from crm_extractor import security
 from crm_extractor.ui_strings import DEFAULT_LANG, LANG_LABELS, t
 
 load_dotenv()

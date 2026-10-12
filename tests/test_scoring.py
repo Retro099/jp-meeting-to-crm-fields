@@ -1,7 +1,5 @@
 import pytest
-
-from scoring import (FIELDS, JUDGED_FIELDS, VERDICT_POINTS, exact_match, overall, parse_verdict,
-                     score_exact, summarize_verdicts)
+from scoring import FIELDS, JUDGED_FIELDS, VERDICT_POINTS, exact_match, overall, parse_verdict, score_exact, summarize_verdicts
 
 
 def test_exact_match_trims_whitespace_only():
@@ -81,6 +79,7 @@ def test_run_eval_output_paths():
 def test_missing_5_set_is_consistent():
     import json
     import os
+
     from scoring import FIELDS, NOT_FOUND
     path = os.path.join(os.path.dirname(__file__), "..", "data", "missing_5.jsonl")
     with open(path, encoding="utf-8") as f:

@@ -1,0 +1,32 @@
+[project]
+name = "jp-meeting-to-crm-fields"
+version = "1.0.0"
+description = "Turn Japanese (and English) sales meeting notes into 5 CRM fields with an LLM, with measured accuracy and prompt-injection defenses."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Retro099" }]
+dynamic = ["dependencies"]
+
+[project.urls]
+Repository = "https://github.com/Retro099/jp-meeting-to-crm-fields"
+Demo = "https://retro-jp-meeting-to-crm-fields.streamlit.app/"
+
+[tool.setuptools]
+packages = ["crm_extractor"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+line-length = 140
+target-version = "py311"
+extend-exclude = ["eval/runs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501", "E741"]  # long JA prompt/test strings; short loop names
