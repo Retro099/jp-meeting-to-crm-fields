@@ -22,3 +22,21 @@ jobs:
         run: pip install -r requirements.txt -r requirements-dev.txt
       - name: Run tests (no network, no API key)
         run: pytest -q
+
+  security-offline:
+    # Prompt-injection defenses: unit tests + attack-dataset checks. No network, no API key.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Defense unit tests (defenses forced on and off)
+        run: pytest -q tests/test_security.py
+      - name: Attack dataset is reproducible
+        run: |
+          python data/make_attacks_v1.py
+          git diff --exit-code data/attacks_v1.jsonl
