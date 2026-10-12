@@ -106,10 +106,28 @@ with st.sidebar:
     st.markdown("---")
     st.caption(t(lang, "sidebar_caption"))
 
-def render_security_panel(report):
+def render_note_scan(hits, defended):
+    """Instruction-like lines found in the input note (shown even when the output is clean)."""
+    if not hits:
+        return False
+    if defended:
+        st.warning(t(lang, "note_scan_defended"))
+    else:
+        st.error(t(lang, "note_scan_undefended"))
+    for h in hits:
+        st.code(h, language=None)
+    return True
+
+
+def render_security_panel(report, note_hits=(), defended=True):
     """Plain list of what the defenses blocked or flagged, and why."""
     st.markdown(t(lang, "security_header"))
+    found = render_note_scan(note_hits, defended)
+    if not defended:
+        return
     events = security.security_events(report)
+    if not events and found:
+        return
     if not events:
         st.caption("✅ " + t(lang, "security_clean"))
         return
@@ -149,13 +167,17 @@ with col2:
             st.warning(limit_error)
         else:
             st.session_state.result = None
+            note_hits = security.scan_note_for_injection(note_input)  # no LLM call
             with st.spinner(t(lang, "spinner")):
                 result = extract_crm_data(client, note_input, defenses=defenses_on)
             if not result["success"] and (result.get("security") or {}).get("canary_leak"):
                 st.error(t(lang, "canary_blocked"))
+                render_note_scan(note_hits, defenses_on)
             elif not result["success"]:
                 st.error(t(lang, "extraction_failed", error=result["error"]))
             else:
+                result["note_hits"] = note_hits
+                result["defended"] = defenses_on
                 st.session_state.result = result
                 for f in CRM_FIELDS:  # prefill the editable fields (未検出 is shown as-is)
                     st.session_state[_edit_key(f)] = result["data"][f]
@@ -171,8 +193,9 @@ with col2:
         m3.metric(t(lang, "metric_completion_tokens"), result["completion_tokens"])
         m4.metric(t(lang, "metric_total_tokens"), result["total_tokens"])
 
-        if "security" in result:
-            render_security_panel(result["security"])
+        if "security" in result or result.get("note_hits"):
+            render_security_panel(result.get("security"), result.get("note_hits", []),
+                                  defended=result.get("defended", "security" in result))
 
         st.divider()
 
