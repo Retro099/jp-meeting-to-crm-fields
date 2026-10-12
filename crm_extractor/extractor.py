@@ -6,8 +6,8 @@ The OpenAI-compatible client is passed in, so tests can use a fake client with n
 import json
 import time
 
-import security
-from prompts import CRM_FIELDS, MODEL_NAME, NOT_FOUND, SYSTEM_PROMPT, TEMPERATURE
+from . import security
+from .prompts import CRM_FIELDS, MODEL_NAME, NOT_FOUND, SYSTEM_PROMPT, TEMPERATURE
 
 
 def build_messages(text, canary=None):

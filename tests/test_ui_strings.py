@@ -2,9 +2,9 @@ import re
 
 import pytest
 
-from demo_limits import MAX_CHARS, MAX_RUNS_PER_SESSION, reserve_run, validate_note
-from prompts import CRM_FIELDS
-from ui_strings import DEFAULT_LANG, LANG_LABELS, STRINGS, t
+from crm_extractor.demo_limits import MAX_CHARS, MAX_RUNS_PER_SESSION, reserve_run, validate_note
+from crm_extractor.prompts import CRM_FIELDS
+from crm_extractor.ui_strings import DEFAULT_LANG, LANG_LABELS, STRINGS, t
 
 
 def test_japanese_is_default_and_both_languages_exist():

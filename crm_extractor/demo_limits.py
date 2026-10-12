@@ -1,6 +1,6 @@
 """Demo limits for the public Streamlit app (pure functions, no Streamlit import)."""
 
-from ui_strings import t
+from .ui_strings import t
 
 MAX_CHARS = 2000            # max characters per note
 MAX_RUNS_PER_SESSION = 5    # max extractions per visitor session

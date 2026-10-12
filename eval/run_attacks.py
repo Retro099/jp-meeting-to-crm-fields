@@ -20,8 +20,8 @@ EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(EVAL_DIR, ".."))
 sys.path.insert(0, EVAL_DIR)
 from attack_scoring import asr_by_category, attack_succeeded  # noqa: E402
-from extractor import extract_crm_data  # noqa: E402
-from prompts import API_BASE_URL, MODEL_NAME, TEMPERATURE  # noqa: E402
+from crm_extractor.extractor import extract_crm_data  # noqa: E402
+from crm_extractor.prompts import API_BASE_URL, MODEL_NAME, TEMPERATURE  # noqa: E402
 
 DATA = os.path.join(EVAL_DIR, "..", "data", "attacks_v1.jsonl")
 CANARY = "CANARY-7f3a9c2e51d84b60"  # test-only marker, not a real secret

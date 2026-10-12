@@ -19,7 +19,7 @@ from openai import OpenAI
 EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(EVAL_DIR, ".."))
 sys.path.insert(0, EVAL_DIR)
-from prompts import API_BASE_URL, MODEL_NAME  # noqa: E402
+from crm_extractor.prompts import API_BASE_URL, MODEL_NAME  # noqa: E402
 from scoring import JUDGED_FIELDS, exact_match, parse_verdict, summarize_verdicts  # noqa: E402
 
 JUDGE_TEMPERATURE = 0
