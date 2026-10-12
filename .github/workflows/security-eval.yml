@@ -2,7 +2,10 @@ name: Security eval (manual, uses API credits)
 
 # Manual only: defenses ON, N repeats of gold_30 (30 calls) + attacks_v1 (40 calls). No judge calls.
 # No automatic retries (OPENAI_MAX_RETRIES=0), so every API request is counted exactly once.
+# Also runs on a push to the branch run/security-eval (so it can be started before this file is on main).
 on:
+  push:
+    branches: [run/security-eval]
   workflow_dispatch:
     inputs:
       repeats:
@@ -24,7 +27,7 @@ jobs:
       MAX_API_CALLS: "220"
       DEFENSES_ENABLED: "1"
       OPENAI_MAX_RETRIES: "0"
-      REPEATS: ${{ inputs.repeats }}
+      REPEATS: ${{ inputs.repeats || '3' }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
