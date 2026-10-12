@@ -3,8 +3,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import extractor
-from prompts import MODEL_NAME, SYSTEM_PROMPT, TEMPERATURE
+from crm_extractor import extractor
+from crm_extractor.prompts import MODEL_NAME, SYSTEM_PROMPT, TEMPERATURE
 
 
 class FakeClient:
@@ -59,7 +59,7 @@ def test_parse_json_object():
 
 
 def test_normalize_fields_marks_missing_as_not_found():
-    from prompts import CRM_FIELDS, NOT_FOUND
+    from crm_extractor.prompts import CRM_FIELDS, NOT_FOUND
     raw = {"会社名": "株式会社ABC", "相手": None, "期限": "  ", "リスク": ["予算", "競合"], "extra": "x"}
     out = extractor.normalize_fields(raw)
     assert list(out) == CRM_FIELDS

@@ -1,4 +1,4 @@
-import prompts
+from crm_extractor import prompts
 
 
 def test_model_settings():

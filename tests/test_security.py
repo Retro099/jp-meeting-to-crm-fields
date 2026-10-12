@@ -3,10 +3,10 @@ from types import SimpleNamespace
 
 import pytest
 
-import extractor
-import security
+from crm_extractor import extractor
+from crm_extractor import security
 from attack_scoring import asr_by_category, attack_succeeded
-from prompts import CRM_FIELDS, NOT_FOUND, SYSTEM_PROMPT
+from crm_extractor.prompts import CRM_FIELDS, NOT_FOUND, SYSTEM_PROMPT
 
 GOOD = {"会社名": "株式会社フロントライン", "相手": "高橋", "次アクション": "API仕様書の送付", "期限": "今月末", "リスク": "先方エンジニアリソース不足"}
 

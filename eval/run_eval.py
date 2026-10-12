@@ -19,9 +19,9 @@ from openai import OpenAI
 # Make the repo root importable so the shared prompt / extractor are used (python eval/run_eval.py)
 EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(EVAL_DIR, ".."))
-from extractor import extract_crm_data  # noqa: E402
-from prompts import API_BASE_URL, MODEL_NAME, TEMPERATURE  # noqa: E402
-from security import defenses_enabled  # noqa: E402
+from crm_extractor.extractor import extract_crm_data  # noqa: E402
+from crm_extractor.prompts import API_BASE_URL, MODEL_NAME, TEMPERATURE  # noqa: E402
+from crm_extractor.security import defenses_enabled  # noqa: E402
 
 DATA_PATH = os.path.join(EVAL_DIR, "..", "data", "gold_30.jsonl")
 DEFAULT_TAG = "t0"

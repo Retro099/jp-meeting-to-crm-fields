@@ -7,16 +7,16 @@ import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from demo_limits import DAILY_CAP, MAX_CHARS, MAX_RUNS_PER_SESSION, reserve_run, validate_note
-from extractor import extract_crm_data
-from prompts import API_BASE_URL, CRM_FIELDS, NOT_FOUND
-import security
-from ui_strings import DEFAULT_LANG, LANG_LABELS, t
+from crm_extractor.demo_limits import DAILY_CAP, MAX_CHARS, MAX_RUNS_PER_SESSION, reserve_run, validate_note
+from crm_extractor.extractor import extract_crm_data
+from crm_extractor.prompts import API_BASE_URL, CRM_FIELDS, NOT_FOUND
+from crm_extractor import security
+from crm_extractor.ui_strings import DEFAULT_LANG, LANG_LABELS, t
 
 load_dotenv()
 
-# Demo limits (MAX_CHARS, MAX_RUNS_PER_SESSION, DAILY_CAP) live in demo_limits.py
-# UI text (Japanese default, English) lives in ui_strings.py
+# Demo limits (MAX_CHARS, MAX_RUNS_PER_SESSION, DAILY_CAP) live in crm_extractor/demo_limits.py
+# UI text (Japanese default, English) lives in crm_extractor/ui_strings.py
 
 # --- UI Layout & Styling ---
 st.set_page_config(page_title="CRM Data Extractor", page_icon="🏢", layout="wide")

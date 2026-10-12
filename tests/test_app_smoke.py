@@ -8,7 +8,7 @@ import pytest
 streamlit = pytest.importorskip("streamlit")
 from streamlit.testing.v1 import AppTest  # noqa: E402
 
-from ui_strings import STRINGS  # noqa: E402
+from crm_extractor.ui_strings import STRINGS  # noqa: E402
 
 MODEL_OUTPUT = {"会社名": "株式会社フロントライン", "相手": "高橋", "次アクション": "API仕様書の送付",
                 "期限": "未検出", "リスク": "先方エンジニアリソース不足"}
@@ -118,7 +118,7 @@ def test_defenses_on_shows_security_panel(app):
 
 
 def test_canary_block_message(app, monkeypatch):
-    import security
+    from crm_extractor import security
     monkeypatch.setattr(security, "new_canary", lambda: "CANARY-fixed")
     monkeypatch.setattr(security, "scan_for_canary", lambda raw, c: True)
     app.toggle(key="defenses").set_value(True).run()

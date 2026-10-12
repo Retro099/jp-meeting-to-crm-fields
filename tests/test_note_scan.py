@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-import security
+from crm_extractor import security
 
 DATA = Path(__file__).resolve().parent.parent / "data"
 

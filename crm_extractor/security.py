@@ -16,7 +16,7 @@ import os
 import re
 import secrets
 
-from prompts import CRM_FIELDS, NOT_FOUND
+from .prompts import CRM_FIELDS, NOT_FOUND
 
 MAX_VALUE_CHARS = 200
 _TRUE = {"1", "true", "yes", "on"}
