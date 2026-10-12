@@ -1,3 +1,9 @@
+# jp-meeting-to-crm-fields
+
+[![CI](https://github.com/Retro099/jp-meeting-to-crm-fields/actions/workflows/ci.yml/badge.svg)](https://github.com/Retro099/jp-meeting-to-crm-fields/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](pyproject.toml)
+
+[English](README.md) | **日本語**
+
 **TL;DR**
 - **Problem:** sales reps re-type messy Japanese meeting notes into the CRM by hand.
 - **Approach:** an LLM (Qwen 2.5 72B) extracts 5 CRM fields as JSON, with a frozen exact-match eval and optional prompt-injection defenses.
@@ -6,11 +12,13 @@
 > Small synthetic data: evaluated on 30 LLM-generated notes (no real customer data), so treat the numbers as indicative, not production accuracy.
 > 小規模な合成データ（LLM で生成した商談メモ 30 件）での評価です。本番環境での精度ではなく目安としてご覧ください。
 
-[![CI](https://github.com/Retro099/jp-meeting-to-crm-fields/actions/workflows/ci.yml/badge.svg)](https://github.com/Retro099/jp-meeting-to-crm-fields/actions/workflows/ci.yml)
+**要約:** 日本語の商談メモから CRM 5 項目を LLM（Qwen 2.5 72B）で JSON 抽出。合成メモ 30 件で完全一致 60.0%（90/150、人が確認する下書きとして）。プロンプトインジェクション攻撃の成功率は防御オンで 45% → 6.7%（自作の攻撃 40 件、防御オンは 3 回平均）、未知の攻撃 20 件では 30% → 10%（各 1 回）。
 
-[English README](README.md)
-
-# jp-meeting-to-crm-fields
+| 指標（合成データ） | 結果 | 注意点 |
+| :--- | :--- | :--- |
+| 完全一致（150 項目） | **60.0%**（90/150） | 合成メモ 30 件、1 回（防御オン 3 回平均: 60.9%） |
+| 攻撃成功率 防御オフ → オン | **45% → 6.7%** | 自作の攻撃 40 件。オフ 1 回、オン 3 回平均 |
+| 未知の攻撃 防御オフ → オン | **30% → 10%**（6/20 → 2/20） | 20 件、各モード 1 回 |
 
 日本語の商談メモから、CRM入力に必要な項目を JSON で抽出するツールです。
 
@@ -88,15 +96,6 @@ streamlit run app.py
 
 Docker でも起動できます。手順は [README.md](README.md) をご覧ください。
 
-## ディレクトリ構成
-
-- `app.py` — Streamlit アプリ（Streamlit Cloud と Docker の起動ファイルのためルートに配置）
-- `crm_extractor/` — 本体パッケージ（プロンプト、抽出 API 呼び出し、セキュリティ対策、デモ制限、UI 文言）
-- `data/` — 評価データ（gold_30、missing_5、攻撃 40 件）
-- `eval/` — 評価スクリプト。全実行結果（数値の元データ）は `eval/runs/<日付>/` に保存
-- `tests/` — pytest（モッククライアント、API キー不要）
-- `docs/` — デモ GIF、スクリーンショット、[セキュリティデモ手順](docs/SECURITY_DEMO.md)
-
 ## セキュリティ（プロンプトインジェクション対策）
 
 商談メモには、顧客のメールなど他人が書いた文章が含まれることがあります。その中に「指示を無視して〇〇と書け」のような命令が紛れ込む攻撃を
@@ -137,6 +136,19 @@ API キーなしのオフライン確認: `pytest -q tests/test_security.py test
 - セキュリティ: 防御オンでも A001・A032 は成功する。攻撃セットは 40 件と小さく、入力スキャンのパターンはこのセットを見て作成（詳細は [SECURITY.md](SECURITY.md)）
 - 完了: 抽出結果の画面上での編集と JSON のコピー・ダウンロード、見つからない項目の「未検出」表示、日本語／英語の表示切り替え
 
+## ディレクトリ構成
+
+- `app.py` — Streamlit アプリ（Streamlit Cloud と Docker の起動ファイルのためルートに配置）
+- `crm_extractor/` — 本体パッケージ（プロンプト、抽出 API 呼び出し、セキュリティ対策、デモ制限、UI 文言）
+- `data/` — 評価データ（gold_30、missing_5、攻撃 40 件、未知の攻撃 20 件）
+- `eval/` — 評価スクリプト。全実行結果（数値の元データ）は `eval/runs/<日付>/` に保存
+- `tests/` — pytest（モッククライアント、API キー不要）
+- `docs/` — デモ GIF、スクリーンショット、[セキュリティデモ手順](docs/SECURITY_DEMO.md)
+
 ## 作者
 
 Prithivi Raj Mohanta
+
+## ライセンス
+
+MIT（[LICENSE](LICENSE)）

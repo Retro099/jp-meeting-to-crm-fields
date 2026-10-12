@@ -1,3 +1,9 @@
+# JP Meeting Note to CRM Fields Extractor
+
+[![CI](https://github.com/Retro099/jp-meeting-to-crm-fields/actions/workflows/ci.yml/badge.svg)](https://github.com/Retro099/jp-meeting-to-crm-fields/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](pyproject.toml)
+
+**English** | [日本語](README.ja.md)
+
 **TL;DR**
 - **Problem:** sales reps re-type messy Japanese meeting notes into the CRM by hand.
 - **Approach:** an LLM (Qwen 2.5 72B) extracts 5 CRM fields as JSON, with a frozen exact-match eval and optional prompt-injection defenses.
@@ -5,11 +11,11 @@
 
 > Small synthetic data: evaluated on 30 LLM-generated notes (no real customer data), so treat the numbers as indicative, not production accuracy.
 
-[![CI](https://github.com/Retro099/jp-meeting-to-crm-fields/actions/workflows/ci.yml/badge.svg)](https://github.com/Retro099/jp-meeting-to-crm-fields/actions/workflows/ci.yml)
-
-[日本語版はこちら](README.ja.md)
-
-# JP Meeting Note to CRM Fields Extractor
+| Metric (synthetic data) | Result | Caveat |
+| :--- | :--- | :--- |
+| Exact match, 150 fields | **60.0%** (90/150) | 30 synthetic notes, 1 run (3-run mean with defenses on: 60.9%) |
+| Attack success, defenses off → on | **45% → 6.7%** | self-authored 40-attack set; off = 1 run, on = mean of 3 runs |
+| Held-out attacks, defenses off → on | **30% → 10%** (6/20 → 2/20) | 20 unseen attacks, 1 run per mode |
 
 日本語の商談メモからCRM項目（相手・会社名・期限・次アクション・リスク）をLLMで抽出し、正解データで精度を評価するプロジェクトです。
 
@@ -172,53 +178,6 @@ Five representative misses from the iteration 5 run (gold → predicted):
 
 *The live deployed app (Streamlit Community Cloud) on a fictional sample note, showing latency/token telemetry, the demo-limit counter, and the raw JSON output.*
 
-## 📂 Repository Structure
-```text
-├── .github/workflows/
-│   ├── ci.yml                 # CI: pytest on Python 3.11 (no network, no secrets)
-│   ├── eval.yml               # Manual accuracy eval (workflow_dispatch, uses the AICREDITS_API_KEY secret)
-│   └── security-eval.yml      # Manual security eval, 3 repeats with defenses on (uses API credits)
-├── crm_extractor/             # Core package (used by the app and the eval scripts)
-│   ├── prompts.py             # Shared system prompt, model name and settings
-│   ├── extractor.py           # The extraction API call + JSON parsing
-│   ├── security.py            # Prompt-injection defenses, provenance check, input note scan
-│   ├── demo_limits.py         # Input-length check and per-session / daily run caps
-│   └── ui_strings.py          # UI text in Japanese (default) and English
-├── data/
-│   ├── gold_30.jsonl          # 30-note labeled evaluation dataset (frozen, synthetic)
-│   ├── missing_5.jsonl        # 5 synthetic notes with 1–2 missing fields (gold 未検出)
-│   ├── attacks_v1.jsonl       # 40 prompt-injection cases (5 categories × 8, JA + EN)
-│   ├── make_attacks_v1.py     # Generates attacks_v1.jsonl
-│   ├── attacks_v2_heldout.jsonl  # 20 held-out attacks, written blind to the scan patterns
-│   └── make_attacks_v2.py     # Generates attacks_v2_heldout.jsonl (how they were written is in its header)
-├── docs/
-│   ├── demo.gif               # Defenses off vs on demo (README top)
-│   ├── SECURITY_DEMO.md       # Side-by-side attack demo with expected results
-│   ├── screenshot_en.png      # Live app, English UI (fictional sample note)
-│   └── screenshot_ja.png      # Live app, Japanese UI (fictional sample note)
-├── eval/
-│   ├── run_eval.py            # Accuracy run on a labelled set -> predictions + run metadata
-│   ├── run_attacks.py         # Attack run (defenses off/on) -> attacks_*.jsonl
-│   ├── judge.py               # LLM-as-judge (semantic) scoring for 次アクション and リスク
-│   ├── scoring.py / attack_scoring.py   # Pure scoring functions (unit-tested)
-│   ├── report.py              # Builds results.md from saved files (no API calls)
-│   ├── security_repeats.py    # Mean/range over the 3 defended runs -> security_repeats.json
-│   ├── results.md             # Accuracy results, cost/latency, failure logs (results_pre_t0.md: history)
-│   ├── security_results.md    # Security results, per-attack details
-│   ├── paths.py               # Where outputs go: eval/runs/<date>/ (override with EVAL_RUN_DIR)
-│   └── runs/<date>/           # Raw predictions, judge verdicts and run metadata for every reported number
-│                              #   2026-10-02: accuracy eval + judge; 2026-10-12: attacks, 3 defended repeats, held-out set
-├── tests/                     # 162 pytest tests incl. Streamlit AppTest smoke tests (mocked client, no API key)
-├── app.py                     # Streamlit entry point (kept in root for Streamlit Cloud and Docker)
-├── SECURITY.md                # Threat model, defense layers, limits
-├── Dockerfile / .dockerignore # Container definition (port 8501)
-├── requirements.txt           # Pinned runtime dependencies (requirements-dev.txt: pytest, ruff); pyproject.toml: metadata + ruff config
-├── pytest.ini                 # pytest settings
-├── LICENSE                    # MIT
-├── README.md
-└── README.ja.md               # Japanese README (日本語版)
-```
-
 ## 🚀 Quick Start (Local Deployment)
 
 ### Prerequisites
@@ -232,7 +191,6 @@ Clone the repository and create a `.env` file in the root directory to securely 
 
 ```env
 AICREDITS_API_KEY="your_actual_key_here"
-
 ```
 
 ### 2. Build the Docker Image
@@ -241,7 +199,6 @@ Construct the lightweight Python container:
 
 ```bash
 docker build -t jp-crm-extractor .
-
 ```
 
 ### 3. Run the Application
@@ -250,7 +207,6 @@ Launch the container, mapping the Streamlit port and injecting the environment v
 
 ```bash
 docker run --rm --name jp-crm-app -p 8501:8501 --env-file .env jp-crm-extractor
-
 ```
 
 *(The `--rm` flag ensures the container automatically cleans itself up when stopped, preventing disk bloat).*
@@ -306,3 +262,55 @@ Community Cloud installs the pinned packages from `requirements.txt`. Apps with 
 - The eval set is small (30 synthetic notes), so a few notes change the score by several points.
 - Security: A001 and A032 still get through with defenses on (plausible-looking values that the attacker wrote into the note); the attack set is small (40) and the note-scan patterns were written against it. See [`SECURITY.md`](SECURITY.md).
 - Done: editable fields in the UI with JSON copy/download, `未検出` for missing fields, and a Japanese/English UI toggle.
+
+## 📂 Repository Structure
+```text
+├── .github/workflows/
+│   ├── ci.yml                 # CI: ruff + pytest on Python 3.11 (no network, no secrets)
+│   ├── heldout-eval.yml       # Manual held-out attack eval (uses API credits)
+│   ├── eval.yml               # Manual accuracy eval (workflow_dispatch, uses the AICREDITS_API_KEY secret)
+│   └── security-eval.yml      # Manual security eval, 3 repeats with defenses on (uses API credits)
+├── crm_extractor/             # Core package (used by the app and the eval scripts)
+│   ├── prompts.py             # Shared system prompt, model name and settings
+│   ├── extractor.py           # The extraction API call + JSON parsing
+│   ├── security.py            # Prompt-injection defenses, provenance check, input note scan
+│   ├── demo_limits.py         # Input-length check and per-session / daily run caps
+│   └── ui_strings.py          # UI text in Japanese (default) and English
+├── data/
+│   ├── gold_30.jsonl          # 30-note labeled evaluation dataset (frozen, synthetic)
+│   ├── missing_5.jsonl        # 5 synthetic notes with 1–2 missing fields (gold 未検出)
+│   ├── attacks_v1.jsonl       # 40 prompt-injection cases (5 categories × 8, JA + EN)
+│   ├── make_attacks_v1.py     # Generates attacks_v1.jsonl
+│   ├── attacks_v2_heldout.jsonl  # 20 held-out attacks, written blind to the scan patterns
+│   └── make_attacks_v2.py     # Generates attacks_v2_heldout.jsonl (how they were written is in its header)
+├── docs/
+│   ├── demo.gif               # Defenses off vs on demo (README top)
+│   ├── SECURITY_DEMO.md       # Side-by-side attack demo with expected results
+│   ├── screenshot_en.png      # Live app, English UI (fictional sample note)
+│   └── screenshot_ja.png      # Live app, Japanese UI (fictional sample note)
+├── eval/
+│   ├── run_eval.py            # Accuracy run on a labelled set -> predictions + run metadata
+│   ├── run_attacks.py         # Attack run (defenses off/on) -> attacks_*.jsonl
+│   ├── judge.py               # LLM-as-judge (semantic) scoring for 次アクション and リスク
+│   ├── scoring.py / attack_scoring.py   # Pure scoring functions (unit-tested)
+│   ├── report.py              # Builds results.md from saved files (no API calls)
+│   ├── security_repeats.py    # Mean/range over the 3 defended runs -> security_repeats.json
+│   ├── results.md             # Accuracy results, cost/latency, failure logs (results_pre_t0.md: history)
+│   ├── security_results.md    # Security results, per-attack details
+│   ├── paths.py               # Where outputs go: eval/runs/<date>/ (override with EVAL_RUN_DIR)
+│   └── runs/<date>/           # Raw predictions, judge verdicts and run metadata for every reported number
+│                              #   2026-10-02: accuracy eval + judge; 2026-10-12: attacks, 3 defended repeats, held-out set
+├── tests/                     # 162 pytest tests incl. Streamlit AppTest smoke tests (mocked client, no API key)
+├── app.py                     # Streamlit entry point (kept in root for Streamlit Cloud and Docker)
+├── SECURITY.md                # Threat model, defense layers, limits
+├── Dockerfile / .dockerignore # Container definition (port 8501)
+├── requirements.txt           # Pinned runtime dependencies (requirements-dev.txt: pytest, ruff); pyproject.toml: metadata + ruff config
+├── pytest.ini                 # pytest settings
+├── LICENSE                    # MIT
+├── README.md
+└── README.ja.md               # Japanese README (日本語版)
+```
+
+## 📄 License
+
+MIT. See [LICENSE](LICENSE).
