@@ -9,6 +9,10 @@
 **▶ Live demo: https://retro-jp-meeting-to-crm-fields.streamlit.app/**<br>
 *It may be asleep if no one has used it recently. Click the wake-up button and wait a moment. Demo limits apply (see below).*
 
+![Security demo: defenses off vs on](docs/demo.gif)
+
+*Same Japanese note with a hidden injected instruction: with defenses off, the company name is hijacked; with defenses on, the injection is flagged and ignored, and the correct company is extracted.*
+
 LLM extraction of CRM fields from unstructured Japanese business meeting notes, with a fixed 30-note exact-match evaluation. The prompt is designed for common patterns in Japanese business notes—corporate abbreviations, honorifics, and informal formatting—and uses Qwen 2.5 72B Instruct to return the fields as JSON.
 
 The project includes a Streamlit frontend (runnable in Docker) that shows the extracted fields, request latency, and token usage for each run.
