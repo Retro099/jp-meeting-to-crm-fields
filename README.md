@@ -35,6 +35,20 @@ Extracting data from Japanese business notes requires handling specific linguist
 4. **Temporal Normalization:** Stripping conversational suffixes (e.g., `まで`) from deadlines to ensure strict CRM date-string compliance.
 5. **Missing fields (未検出):** if a field is truly absent from the note, the model must output exactly `未検出` instead of guessing. The app and eval also turn a missing key, null, or blank value into `未検出`.
 
+## 🛡️ Prompt-injection defense (OWASP LLM01:2025)
+Meeting notes can contain text written by others, so the extractor has optional layered defenses (`DEFENSES_ENABLED=1`, off by default): spotlighting with random delimiters, a canary secret scan, strict schema validation, a field allowlist, and refusal of instruction-like values. Tested on 40 JA/EN attack cases (`data/attacks_v1.jsonl`), one temperature-0 run per mode on 2026-10-12:
+
+| Attack category | Cases | ASR, defenses off | ASR, defenses on |
+| :--- | :--- | :--- | :--- |
+| hidden_instruction | 8 | 3/8 (37.5%) | 1/8 (12.5%) |
+| canary_leak | 8 | 5/8 (62.5%) | 0/8 (0.0%) |
+| format_break | 8 | 3/8 (37.5%) | 0/8 (0.0%) |
+| role_spoofing | 8 | 7/8 (87.5%) | 3/8 (37.5%) |
+| field_poisoning | 8 | 0/8 (0.0%) | 0/8 (0.0%) |
+| **All** | 40 | 18/40 (45.0%) | 4/40 (10.0%) |
+
+With defenses on, exact match on the frozen set was **59.3% (89/150)** vs 60.0% without, one field lower. The 4 attacks that still pass all inject plausible-looking values; details and limits in [`SECURITY.md`](SECURITY.md) and [`eval/security_results.md`](eval/security_results.md).
+
 ## 📊 Evaluation Metrics
 The pipeline is evaluated against a 30-note labeled dataset (`data/gold_30.jsonl`) with a strict exact-string match, plus an LLM-as-judge semantic score for the two free-text fields.
 

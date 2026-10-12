@@ -1,0 +1,14 @@
+{
+  "run_date_ist": "2026-10-12T14:25+05:30",
+  "dataset": "data/gold_30.jsonl",
+  "model": "qwen/qwen-2.5-72b-instruct",
+  "temperature": 0,
+  "defenses_enabled": true,
+  "notes": 30,
+  "api_calls": 30,
+  "failed_calls": 0,
+  "prompt_tokens": 22950,
+  "completion_tokens": 2137,
+  "total_tokens": 25087,
+  "avg_latency_s": 5.77
+}

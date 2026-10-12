@@ -21,6 +21,7 @@ EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(EVAL_DIR, ".."))
 from extractor import extract_crm_data  # noqa: E402
 from prompts import API_BASE_URL, MODEL_NAME, TEMPERATURE  # noqa: E402
+from security import defenses_enabled  # noqa: E402
 
 DATA_PATH = os.path.join(EVAL_DIR, "..", "data", "gold_30.jsonl")
 DEFAULT_TAG = "t0"
@@ -37,7 +38,7 @@ def load_gold(path=DATA_PATH):
 
 def run_eval(data_path=DATA_PATH, tag=DEFAULT_TAG):
     load_dotenv()
-    client = OpenAI(api_key=os.getenv("AICREDITS_API_KEY"), base_url=API_BASE_URL)
+    client = OpenAI(api_key=os.getenv("AICREDITS_API_KEY"), base_url=API_BASE_URL, timeout=90, max_retries=1)
     records = load_gold(data_path)
     pred_path, meta_path = output_paths(tag)
     print(f"Starting evaluation of {len(records)} notes using {MODEL_NAME} (temperature={TEMPERATURE})...")
@@ -72,6 +73,7 @@ def run_eval(data_path=DATA_PATH, tag=DEFAULT_TAG):
         "dataset": os.path.relpath(os.path.abspath(data_path), os.path.join(EVAL_DIR, "..")),
         "model": MODEL_NAME,
         "temperature": TEMPERATURE,
+        "defenses_enabled": defenses_enabled(),
         "notes": len(rows),
         "api_calls": len(rows),
         "failed_calls": sum(1 for r in rows if not r["success"]),
