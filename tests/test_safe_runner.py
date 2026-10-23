@@ -86,8 +86,9 @@ def test_429_twice_stops(tmp_path):
 def test_max_calls_and_per_day(tmp_path):
     with pytest.raises(sr.StopRun, match="Hard cap"):
         sr.run_batch(ITEMS, lambda p: {}, str(tmp_path / "a.jsonl"), max_calls=2)
-    with pytest.raises(sr.StopRun, match="Daily pace"):
+    with pytest.raises(sr.StopRun, match="Daily pace") as e:
         sr.run_batch(ITEMS, lambda p: {}, str(tmp_path / "b.jsonl"), per_day=1)
+    assert e.value.code == sr.EXIT_DAY
 
 
 def test_spend_cap(tmp_path):
