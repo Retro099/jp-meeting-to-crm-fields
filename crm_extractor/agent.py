@@ -1,4 +1,4 @@
-"""Optional LangGraph agent: extract -> validate -> repair (max 1 retry) -> done.
+"""Optional LangGraph agent: extract -> validate -> repair (max 2 retries) -> done.
 
 EXPERIMENTAL and opt-in. The default path is still `extractor.extract_crm_data` (unchanged).
 Reuses the shared prompt (prompts.py), the message builders and parsing in extractor.py, and
@@ -14,7 +14,7 @@ from . import security
 from .extractor import build_defended_messages, build_messages, normalize_fields, parse_json_object
 from .prompts import CRM_FIELDS, MODEL_NAME, TEMPERATURE
 
-MAX_REPAIRS = 1
+MAX_REPAIRS = 2
 
 
 class AgentState(TypedDict, total=False):

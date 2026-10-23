@@ -102,14 +102,14 @@ hidden with zero-width characters; H019: a shell command written into the note a
 
 Off by default. The default app and eval still use the single-call `extract_crm_data`.
 
-`crm_extractor/agent.py` runs a small LangGraph graph: **extract → validate → repair (at most 1 retry) → done**. Validation reuses the existing JSON parsing and `security.validate_schema` (all 5 keys present, text-only, single-line, length limit). On failure the model is re-prompted once with the list of errors; if it still fails, the result comes back with `agent.valid = False` and the errors listed, instead of retrying forever.
+`crm_extractor/agent.py` runs a small LangGraph graph: **extract → validate → repair (at most 2 retries) → done**. Validation reuses the existing JSON parsing and `security.validate_schema` (all 5 keys present, text-only, single-line, length limit). On failure the model is re-prompted (up to twice) with the list of errors; if it still fails, the result comes back with `agent.valid = False` and the errors listed, instead of retrying forever.
 
 ```python
 from crm_extractor.agent import extract_crm_data_agent
 result = extract_crm_data_agent(client, note, defenses=True)  # same shape as extract_crm_data + result["agent"]
 ```
 
-In the app, turn on **🧪 LangGraph agent (experimental)** in the sidebar. It uses up to 2 API calls per note. It is covered by mocked-LLM unit tests only; it has not been measured on the eval sets yet, so there are no accuracy claims for it.
+In the app, turn on **🧪 LangGraph agent (experimental)** in the sidebar. It uses up to 3 API calls per note. It is covered by mocked-LLM unit tests only; it has not been measured on the eval sets yet, so there are no accuracy claims for it.
 
 ## 📊 Evaluation Metrics
 **How to read 60.0%:** this is a human-in-the-loop draft, not autopilot. The rep reviews and edits the fields before saving.

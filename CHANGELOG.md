@@ -3,9 +3,9 @@
 ## [Unreleased]
 
 ### Added
-- Optional, experimental LangGraph agent (`crm_extractor/agent.py`): extract -> validate -> repair (max 1 retry, re-prompted with the validation errors) -> done. Reuses the shared prompt, message builders, JSON parsing and `security.validate_schema`. Results carry an `agent` block (`calls`, `repairs`, `errors`, `valid`).
+- Optional, experimental LangGraph agent (`crm_extractor/agent.py`): extract -> validate -> repair (max 2 retries, re-prompted with the validation errors) -> done. Reuses the shared prompt, message builders, JSON parsing and `security.validate_schema`. Results carry an `agent` block (`calls`, `repairs`, `errors`, `valid`).
 - Off-by-default "LangGraph agent (experimental)" toggle in the Streamlit sidebar.
-- `tests/test_agent.py`: mocked-LLM tests (valid first try, invalid then repaired, invalid twice -> errors flagged, defenses on).
+- `tests/test_agent.py`: mocked-LLM tests (valid first try, invalid then repaired, repaired on 2nd retry, invalid 3 times -> errors flagged, defenses on).
 - `langgraph==1.2.16` pinned in `requirements.txt`.
 
 ### Unchanged

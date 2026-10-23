@@ -39,18 +39,24 @@ def test_invalid_then_repaired():
     assert r["total_tokens"] == 30
 
 
-def test_invalid_twice_returns_errors_flagged():
-    c = FakeClient(["not json", "still not json"])
+def test_invalid_twice_repaired_on_second_retry():
+    c = FakeClient(["not json", "still not json", json.dumps(GOOD, ensure_ascii=False)])
     r = extract_crm_data_agent(c, "メモ", defenses=False)
-    assert not r["success"] and r["agent"]["calls"] == 2 and not r["agent"]["valid"]
+    assert r["success"] and r["agent"]["valid"] and r["agent"]["repairs"] == 2 and r["agent"]["calls"] == 3
+
+
+def test_invalid_three_times_returns_errors_flagged():
+    c = FakeClient(["not json", "still not json", "nope"])
+    r = extract_crm_data_agent(c, "メモ", defenses=False)
+    assert not r["success"] and r["agent"]["calls"] == 3 and not r["agent"]["valid"]
     assert r["agent"]["errors"]
 
 
-def test_schema_problem_twice_flagged_but_fields_returned():
+def test_schema_problem_three_times_flagged_but_fields_returned():
     bad = dict(GOOD, リスク="一行目\n二行目")
-    c = FakeClient([json.dumps(bad, ensure_ascii=False)] * 2)
+    c = FakeClient([json.dumps(bad, ensure_ascii=False)] * 3)
     r = extract_crm_data_agent(c, "メモ", defenses=False)
-    assert r["success"] and not r["agent"]["valid"] and r["agent"]["calls"] == 2
+    assert r["success"] and not r["agent"]["valid"] and r["agent"]["calls"] == 3
     assert any("multi-line" in e for e in r["agent"]["errors"])
 
 
