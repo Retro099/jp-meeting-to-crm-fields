@@ -98,6 +98,19 @@ hidden with zero-width characters; H019: a shell command written into the note a
    Run it with defenses off, then on, and compare 会社名. More cases: [`docs/SECURITY_DEMO.md`](docs/SECURITY_DEMO.md) and `data/attacks_v1.jsonl`.
 4. Offline (no key, no cost): `pytest -q tests/test_security.py tests/test_note_scan.py`.
 
+## 🧪 Optional: LangGraph agent (experimental)
+
+Off by default. The default app and eval still use the single-call `extract_crm_data`.
+
+`crm_extractor/agent.py` runs a small LangGraph graph: **extract → validate → repair (at most 1 retry) → done**. Validation reuses the existing JSON parsing and `security.validate_schema` (all 5 keys present, text-only, single-line, length limit). On failure the model is re-prompted once with the list of errors; if it still fails, the result comes back with `agent.valid = False` and the errors listed, instead of retrying forever.
+
+```python
+from crm_extractor.agent import extract_crm_data_agent
+result = extract_crm_data_agent(client, note, defenses=True)  # same shape as extract_crm_data + result["agent"]
+```
+
+In the app, turn on **🧪 LangGraph agent (experimental)** in the sidebar. It uses up to 2 API calls per note. It is covered by mocked-LLM unit tests only; it has not been measured on the eval sets yet, so there are no accuracy claims for it.
+
 ## 📊 Evaluation Metrics
 **How to read 60.0%:** this is a human-in-the-loop draft, not autopilot. The rep reviews and edits the fields before saving.
 Per field (exact match, 30 notes): 相手 100% (30/30), 会社名 96.7% (29/30) and 期限 80.0% (24/30) are reliable;

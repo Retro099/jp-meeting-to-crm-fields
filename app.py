@@ -103,6 +103,7 @@ with st.sidebar:
     defenses_on = st.toggle(t(lang, "defenses_toggle"), value=security.defenses_enabled(),
                             help=t(lang, "defenses_help"), key="defenses")
     (st.success if defenses_on else st.caption)(t(lang, "defenses_on" if defenses_on else "defenses_off"))
+    agent_on = st.toggle(t(lang, "agent_toggle"), value=False, help=t(lang, "agent_help"), key="agent")
     st.markdown("---")
     st.caption(t(lang, "sidebar_caption"))
 
@@ -169,7 +170,11 @@ with col2:
             st.session_state.result = None
             note_hits = security.scan_note_for_injection(note_input)  # no LLM call
             with st.spinner(t(lang, "spinner")):
-                result = extract_crm_data(client, note_input, defenses=defenses_on)
+                if agent_on:  # experimental, off by default
+                    from crm_extractor.agent import extract_crm_data_agent
+                    result = extract_crm_data_agent(client, note_input, defenses=defenses_on)
+                else:
+                    result = extract_crm_data(client, note_input, defenses=defenses_on)
             if not result["success"] and (result.get("security") or {}).get("canary_leak"):
                 st.error(t(lang, "canary_blocked"))
                 render_note_scan(note_hits, defenses_on)
