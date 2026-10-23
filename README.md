@@ -111,7 +111,9 @@ result = extract_crm_data_agent(client, note, defenses=True)  # same shape as ex
 
 In the app, turn on **🧪 LangGraph agent (experimental)** in the sidebar. It uses up to 3 API calls per note. It is covered by mocked-LLM unit tests only; it has not been measured on the eval sets yet, so there are no accuracy claims for it.
 
-**Fail-safe paid runs.** `eval/safe_runner.py` checkpoints every call to JSONL and resumes from it, stops cleanly on 402 / insufficient balance / quota, retries a plain 429 once, and enforces hard caps (2,000 calls, 400/day, ₹100) plus a balance buffer checked via AICredits `GET /v1/credits`. Tested with mocks only.
+**Fail-safe paid runs.** `eval/safe_runner.py` checkpoints every call to JSONL and resumes from it, stops cleanly on 402 / insufficient balance / quota, retries a plain 429 once, and enforces hard caps (2,000 calls, 400/day, ₹100) plus a balance buffer checked via AICredits `GET /api/credits`. Tested with mocks only.
+
+**Eval v2 (in progress).** `eval/eval_v2.py` compares the old path and the agent in one session (same 30 notes, 3 runs each, exact match + per-field LLM judge, cost/latency, held-out attacks). Results will be added here from `eval/report_v2.py` once the run finishes.
 
 ## 📊 Evaluation Metrics
 **How to read 60.0%:** this is a human-in-the-loop draft, not autopilot. The rep reviews and edits the fields before saving.
