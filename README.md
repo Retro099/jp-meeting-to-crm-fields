@@ -194,7 +194,7 @@ Tested the optional LangGraph agent (extract → validate → repair) against th
 | Repairs needed | – | 0 of 89 |
 | ₹ per note (estimated) | 0.0224 | 0.0221 |
 
-Limits: 30 synthetic notes (one note = 3.3 points) and 20 attacks (one attack = 5 points), so the differences above are within noise; the judge is the same model as the extractor (a ~20-verdict human spot-check sheet is in [`eval/spotcheck_v2.md`](eval/spotcheck_v2.md), not yet filled in); 3 runs at temperature 0 measure provider non-determinism only; ₹ is estimated from tokens × the published price, not the invoice.
+Limits: 30 synthetic notes (one note = 3.3 points) and 20 attacks (one attack = 5 points), so the differences above are within noise; the judge is the same model as the extractor (a manual check of 20 random judge grades on 2026-10-30 agreed with the judge on all 20, for both verdict and supported; small sample, see [`eval/spotcheck_v2.md`](eval/spotcheck_v2.md)); 3 runs at temperature 0 measure provider non-determinism only; ₹ is estimated from tokens × the published price, not the invoice.
 
 ### Failure analysis
 

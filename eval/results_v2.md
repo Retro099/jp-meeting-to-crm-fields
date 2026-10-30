@@ -47,7 +47,7 @@ Total recorded API calls: 1320; estimated spend ₹29.14 (tokens × /api/models 
 ### Limits
 
 - 30 notes and 20 attacks are small sets: one note is 3.3 points, one attack is 5 points.
-- The judge is the same model as the extractor (self-judging bias); a human spot-check of a random sample is in spotcheck_v2.md.
+- The judge is the same model as the extractor (self-judging bias); a human spot-check of 20 random judge grades (2026-10-30) agreed with the judge on 20/20 verdicts and 20/20 supported flags; small sample, see spotcheck_v2.md.
 - 3 runs at temperature 0 measure provider non-determinism, not sampling diversity.
 - Extraction comparison uses defenses off, matching the frozen 2026-10-02 eval; attacks are run both ways.
 - ₹ is estimated from token counts and the published per-token price, not read from the invoice.

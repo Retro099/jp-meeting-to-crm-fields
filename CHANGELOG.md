@@ -13,6 +13,7 @@
 - `safe_runner`: balance URL changed to `GET /api/credits` (the documented `/v1/credits` returns 404); daily cap is its own exit code (6) and accounts for the agent's worst case of 3 calls per item.
 - `langgraph==1.2.16` pinned in `requirements.txt`.
 - Eval v2 results (finished 2026-10-27): `eval/results_v2.md` and README section. Exact match 59.8% (single-call) vs 58.4% (agent); held-out attack success 30%→8.3% vs 30%→10% with defenses on; 0 repairs in 89 agent extractions; 1,320 calls, ~₹29.14 estimated. Finding: no gain from the agent path on this data.
+- Eval v2 manual spot-check (2026-10-30): 20 random judge grades (seed 42) checked by hand; 20/20 agree on verdict, 20/20 on supported. Filled in `eval/spotcheck_v2.md`; README and `eval/results_v2.md` updated. Small sample.
 - `eval/spotcheck_v2.md`: 20-row human spot-check sheet for the judge (seed 42).
 - `safe_runner`: writes the exact API error (never the key) to `errors.log` on a stop.
 - CI also runs on pushes to `feat/**`.
