@@ -23,6 +23,10 @@ STRINGS = {
                         "機密情報や個人情報は貼り付けないでください。",
         "usage_caption": "{chars}/{max_chars} 文字 · このセッションの残り実行回数 {left}/{max_runs}",
         "run_button": "抽出を実行",
+        "slow_note": "モデル提供元が混雑している時は、最大1分ほどかかる場合があります。",
+        "model_caption": "回答したモデル: {model}",
+        "fallback_caution": "メインのモデルが時間内に応答しなかったため、予備のモデルで回答しました。"
+                            "README の精度の数値はメインのモデルでのみ測定したものです。",
         "results_header": "2. 抽出結果",
         "spinner": "Qwen 72B で処理中…",
         "extraction_failed": "抽出に失敗しました: {error}",
@@ -86,6 +90,10 @@ STRINGS = {
                         "Don't paste confidential or personal data.",
         "usage_caption": "{chars}/{max_chars} characters · {left}/{max_runs} demo runs left this session",
         "run_button": "Run Extraction",
+        "slow_note": "This can take up to a minute when the model provider is busy.",
+        "model_caption": "Answered by: {model}",
+        "fallback_caution": "The main model did not answer in time, so the backup model answered. "
+                            "The accuracy numbers in the README were measured on the main model only.",
         "results_header": "2. Extraction Results",
         "spinner": "Processing via Qwen 72B...",
         "extraction_failed": "Extraction failed: {error}",

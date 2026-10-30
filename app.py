@@ -9,7 +9,7 @@ from openai import OpenAI
 
 from crm_extractor import security
 from crm_extractor.demo_limits import DAILY_CAP, MAX_CHARS, MAX_RUNS_PER_SESSION, reserve_run, validate_note
-from crm_extractor.extractor import extract_crm_data
+from crm_extractor.extractor import extract_with_fallback
 from crm_extractor.prompts import API_BASE_URL, CRM_FIELDS, NOT_FOUND
 from crm_extractor.ui_strings import DEFAULT_LANG, LANG_LABELS, t
 
@@ -155,6 +155,7 @@ with col1:
     st.caption(t(lang, "privacy_note"))
     usage_caption = st.empty()  # filled in at the end, after this run is counted
     extract_btn = st.button(t(lang, "run_button"), type="primary", use_container_width=True)
+    st.caption(t(lang, "slow_note"))
 
 with col2:
     st.subheader(t(lang, "results_header"))
@@ -174,7 +175,7 @@ with col2:
                     from crm_extractor.agent import extract_crm_data_agent
                     result = extract_crm_data_agent(client, note_input, defenses=defenses_on)
                 else:
-                    result = extract_crm_data(client, note_input, defenses=defenses_on)
+                    result = extract_with_fallback(client, note_input, defenses=defenses_on)
             if not result["success"] and (result.get("security") or {}).get("canary_leak"):
                 st.error(t(lang, "canary_blocked"))
                 render_note_scan(note_hits, defenses_on)
@@ -197,6 +198,10 @@ with col2:
         m2.metric(t(lang, "metric_prompt_tokens"), result["prompt_tokens"])
         m3.metric(t(lang, "metric_completion_tokens"), result["completion_tokens"])
         m4.metric(t(lang, "metric_total_tokens"), result["total_tokens"])
+        if result.get("model"):
+            st.caption(t(lang, "model_caption", model=result["model"]))
+        if result.get("fallback_used"):
+            st.warning(t(lang, "fallback_caution"))
 
         if "security" in result or result.get("note_hits"):
             render_security_panel(result.get("security"), result.get("note_hits", []),

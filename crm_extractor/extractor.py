@@ -6,7 +6,10 @@ The OpenAI-compatible client is passed in, so tests can use a fake client with n
 import json
 import time
 
+import openai
+
 from . import security
+from . import prompts
 from .prompts import CRM_FIELDS, MODEL_NAME, NOT_FOUND, SYSTEM_PROMPT, TEMPERATURE
 
 
@@ -55,7 +58,7 @@ def normalize_fields(data):
     return out
 
 
-def extract_crm_data(client, text, defenses=None, canary=None):
+def extract_crm_data(client, text, defenses=None, canary=None, model=None):
     """Call the model once. Returns a dict with success, data (normalized) / raw_data or error, latency and token usage.
 
     defenses: None reads the DEFENSES_ENABLED env flag (off by default); True/False forces it.
@@ -71,7 +74,7 @@ def extract_crm_data(client, text, defenses=None, canary=None):
     start = time.perf_counter()
     try:
         response = client.chat.completions.create(
-            model=MODEL_NAME,
+            model=model or MODEL_NAME,
             messages=messages,
             response_format={"type": "json_object"},
             temperature=TEMPERATURE,
@@ -99,6 +102,33 @@ def extract_crm_data(client, text, defenses=None, canary=None):
             "prompt_tokens": getattr(usage, "prompt_tokens", None),
             "completion_tokens": getattr(usage, "completion_tokens", None),
             "total_tokens": getattr(usage, "total_tokens", None),
+            "model": model or MODEL_NAME,
         }
     except Exception as e:
-        return {"success": False, "error": str(e), "latency": round(time.perf_counter() - start, 2)}
+        return {"success": False, "error": str(e), "latency": round(time.perf_counter() - start, 2),
+                "model": model or MODEL_NAME, "timed_out": isinstance(e, openai.APITimeoutError)}
+
+
+def _with_options(client, **opts):
+    """client.with_options(...) when available (real OpenAI client); fake test clients are used as-is."""
+    fn = getattr(client, "with_options", None)
+    return fn(**opts) if callable(fn) else client
+
+
+def extract_with_fallback(client, text, defenses=None, primary_timeout=None, fallback_model=None):
+    """Primary model with a time limit; on a timeout only, one retry on the fallback model.
+
+    Other errors (402, 429, bad JSON, ...) are returned as-is, with no fallback.
+    The result carries "model" (who answered) and "fallback_used".
+    """
+    timeout = prompts.PRIMARY_TIMEOUT_S if primary_timeout is None else primary_timeout
+    fb = prompts.FALLBACK_MODEL if fallback_model is None else fallback_model
+    first = extract_crm_data(_with_options(client, timeout=timeout, max_retries=0), text, defenses=defenses)
+    if first["success"] or not first.get("timed_out") or not fb:
+        first["fallback_used"] = False
+        return first
+    second = extract_crm_data(_with_options(client, timeout=prompts.FALLBACK_TIMEOUT_S, max_retries=0),
+                              text, defenses=defenses, model=fb)
+    second["fallback_used"] = True
+    second["latency"] = round(first["latency"] + second["latency"], 2)  # total wait the user saw
+    return second

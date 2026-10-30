@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- Slow-model fallback (single-call path): `extract_with_fallback` gives the main model 25 s (`PRIMARY_TIMEOUT_S`); on a timeout only, retries once on `qwen/qwen3-235b-a22b-2507` (`FALLBACK_MODEL`, empty = off) through the same gateway. One click still counts as one run. App shows which model answered, a caution when the backup answered, and a note that a run can take up to a minute (JA/EN). `tests/test_fallback.py` (mocked client). Backup checked once on gold_30: exact match 60.0% (one run; main model 59.8% is a 3-run mean), ~₹0.26.
 - Optional, experimental LangGraph agent (`crm_extractor/agent.py`): extract -> validate -> repair (max 2 retries, re-prompted with the validation errors) -> done. Reuses the shared prompt, message builders, JSON parsing and `security.validate_schema`. Results carry an `agent` block (`calls`, `repairs`, `errors`, `valid`).
 - Off-by-default "LangGraph agent (experimental)" toggle in the Streamlit sidebar.
 - `tests/test_agent.py`: mocked-LLM tests (valid first try, invalid then repaired, repaired on 2nd retry, invalid 3 times -> errors flagged, defenses on).

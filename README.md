@@ -196,6 +196,10 @@ Tested the optional LangGraph agent (extract → validate → repair) against th
 
 Limits: 30 synthetic notes (one note = 3.3 points) and 20 attacks (one attack = 5 points), so the differences above are within noise; the judge is the same model as the extractor (a manual check of 20 random judge grades on 2026-10-30 agreed with the judge on all 20, for both verdict and supported; small sample, see [`eval/spotcheck_v2.md`](eval/spotcheck_v2.md)); 3 runs at temperature 0 measure provider non-determinism only; ₹ is estimated from tokens × the published price, not the invoice.
 
+### Backup model when the main model is slow (2026-10-30)
+
+All accuracy numbers in this README apply to the main model, `qwen/qwen-2.5-72b-instruct`, only. The app's default (single-call) path waits up to 25 seconds for it (`PRIMARY_TIMEOUT_S`); if there is no answer by then, it retries once on a backup model, `qwen/qwen3-235b-a22b-2507`, through the same AICredits gateway (`FALLBACK_MODEL`; set it to an empty string to turn this off). Other errors such as 402 or 429 do not trigger the backup. The app shows which model answered. The backup was checked once on the same 30 notes (temperature 0, single run, single-call path, no judge): exact match overall 60.0% (90/150), 30 calls, about ₹0.26 estimated. That is one run, not comparable as a 3-run mean like the main model's 59.8%; no other claim is made about the backup model. The LangGraph agent path does not use the backup.
+
 ### Failure analysis
 
 Five representative misses from the iteration 5 run (gold → predicted):
