@@ -3,7 +3,7 @@
 Every finished call is appended to a JSONL checkpoint, keyed by run/path/note/field, so a re-run skips
 completed keys. 402 / insufficient balance / quota errors stop at once (exit 3). A plain 429 rate limit
 gets ONE backoff retry, then stops (exit 4). --max-calls is a hard cap; --per-day paces calls per IST day.
-Before a batch it checks GET /v1/credits (AICredits docs) and stops while a buffer remains for the live demo.
+Before a batch it checks GET /api/credits (verified 2026-10-23; the documented /v1/credits returned 404) and stops while a buffer remains for the live demo.
 The key is read from AICREDITS_API_KEY and never printed.
 """
 
@@ -18,10 +18,10 @@ DEFAULT_MAX_CALLS = 2000
 DEFAULT_PER_DAY = 400
 DEFAULT_MAX_SPEND_INR = 100.0
 DEFAULT_BUFFER_INR = 20.0  # left untouched for the live Streamlit demo (same account)
-CREDITS_URL = "https://api.aicredits.in/v1/credits"
+CREDITS_URL = "https://api.aicredits.in/api/credits"
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 
-EXIT_OK, EXIT_CAP, EXIT_BALANCE, EXIT_BILLING, EXIT_RATE = 0, 2, 5, 3, 4
+EXIT_OK, EXIT_CAP, EXIT_BALANCE, EXIT_BILLING, EXIT_RATE, EXIT_DAY = 0, 2, 5, 3, 4, 6
 BILLING_WORDS = ("insufficient", "quota", "balance", "budget", "payment required", "credits")
 
 
@@ -87,10 +87,11 @@ def run_batch(items, call, checkpoint, max_calls=DEFAULT_MAX_CALLS, per_day=DEFA
         if key in done:
             skipped += 1
             continue
-        if total >= max_calls:
+        need = payload.get("max_calls", 1) if isinstance(payload, dict) else 1  # worst case for this item
+        if total + need > max_calls:
             raise StopRun(EXIT_CAP, f"Hard cap of {max_calls} calls reached. Stopping.")
-        if by_day.get(day, 0) >= per_day:
-            raise StopRun(EXIT_CAP, f"Daily pace of {per_day} calls reached for {day}. Resume tomorrow.")
+        if by_day.get(day, 0) + need > per_day:
+            raise StopRun(EXIT_DAY, f"Daily pace of {per_day} calls reached for {day}. Resume tomorrow.")
         if spend >= max_spend_inr:
             raise StopRun(EXIT_CAP, f"Spend cap ₹{max_spend_inr:.2f} reached. Stopping.")
         attempts = 0
@@ -101,6 +102,12 @@ def run_batch(items, call, checkpoint, max_calls=DEFAULT_MAX_CALLS, per_day=DEFA
                 break
             except Exception as e:
                 kind = classify_error(e)
+                try:  # keep the exact error (never the key) so a stop can be diagnosed
+                    _msg = (str(getattr(e, "status_code", "")) + " " + type(e).__name__ + " " + str(getattr(e, "body", "") or e))[:600]
+                    with open(os.path.join(os.path.dirname(checkpoint) or ".", "errors.log"), "a", encoding="utf-8") as ef:
+                        ef.write(f"{key}\tkind={kind}\t{_msg}\n")
+                except Exception:
+                    pass
                 if kind == "billing":
                     raise StopRun(EXIT_BILLING, "Billing/quota error from the API (402 or insufficient balance). Stopping, no retry.") from None
                 if kind == "rate" and attempts == 1:
@@ -110,12 +117,13 @@ def run_batch(items, call, checkpoint, max_calls=DEFAULT_MAX_CALLS, per_day=DEFA
                     raise StopRun(EXIT_RATE, "Still rate-limited (429) after one backoff retry. Stopping.") from None
                 result = {"success": False, "error": type(e).__name__}
                 break
-        rec = {"key": key, "day": day, "calls": attempts, "cost_inr": result.get("cost_inr"), "result": result}
+        used = result.pop("api_calls", None) or attempts  # exact count when the caller reports it
+        rec = {"key": key, "day": day, "calls": used, "cost_inr": result.get("cost_inr"), "result": result}
         with open(checkpoint, "a", encoding="utf-8") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
         done.add(key)
-        by_day[day] = by_day.get(day, 0) + attempts
-        total += attempts
+        by_day[day] = by_day.get(day, 0) + used
+        total += used
         spend += result.get("cost_inr") or 0.0
         made += 1
     return {"made": made, "skipped": skipped, "total_calls": total, "spend_inr": round(spend, 4)}

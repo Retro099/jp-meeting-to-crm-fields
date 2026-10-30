@@ -1,0 +1,25 @@
+あなたは、日本語の商談メモから抽出されたCRM項目を採点する評価者です。
+You are grading one CRM field extracted from a Japanese sales meeting note.
+
+項目 (field): <<FIELD>>
+商談メモ (source note): <<NOTE>>
+正解 (gold answer): <<GOLD>>
+予測 (predicted answer): <<PRED>>
+
+2つの判定をしてください / Make two judgements:
+
+1. verdict — 予測が正解と同じ内容か / Does the prediction express the same content as the gold?
+- match: 正解の要点をすべて含み、意味が同じ。言い換え・語順・助詞・語尾・表記の違いは問わない。
+  Covers every key point of the gold with the same meaning. Ignore paraphrase, word order, particles, endings and notation.
+- partial: 要点の一部のみ、または重要な具体情報（対象・数量・相手など）が欠けている。
+  Only some key points, or an important specific detail is missing.
+- miss: 要点を含まない、別の内容、または空。 / Different content, or empty.
+- 正解が「未検出」の場合、予測も「未検出」なら match。 / If gold is 未検出, a 未検出 prediction is a match.
+
+2. supported — 予測の内容が商談メモに書かれている（または素直に読み取れる）か。メモにない情報を作っていれば false。予測が「未検出」の場合は、メモに本当に情報がなければ true。
+   Is everything in the prediction stated in (or directly readable from) the source note? false if it adds facts not in the note. For a 未検出 prediction: true only if the note really lacks that information.
+
+正解自体の正しさは評価しないでください。 / Do not judge whether the gold itself is correct.
+
+JSONのみを出力 / Output JSON only:
+{"verdict": "match" | "partial" | "miss", "supported": true | false, "reason": "<one short sentence in English>"}
