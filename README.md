@@ -98,6 +98,23 @@ hidden with zero-width characters; H019: a shell command written into the note a
    Run it with defenses off, then on, and compare 会社名. More cases: [`docs/SECURITY_DEMO.md`](docs/SECURITY_DEMO.md) and `data/attacks_v1.jsonl`.
 4. Offline (no key, no cost): `pytest -q tests/test_security.py tests/test_note_scan.py`.
 
+## 🧪 Optional: LangGraph agent (experimental)
+
+Off by default. The default app and eval still use the single-call `extract_crm_data`.
+
+`crm_extractor/agent.py` runs a small LangGraph graph: **extract → validate → repair (at most 2 retries) → done**. Validation reuses the existing JSON parsing and `security.validate_schema` (all 5 keys present, text-only, single-line, length limit). On failure the model is re-prompted (up to twice) with the list of errors; if it still fails, the result comes back with `agent.valid = False` and the errors listed, instead of retrying forever.
+
+```python
+from crm_extractor.agent import extract_crm_data_agent
+result = extract_crm_data_agent(client, note, defenses=True)  # same shape as extract_crm_data + result["agent"]
+```
+
+In the app, turn on **🧪 LangGraph agent (experimental)** in the sidebar. It uses up to 3 API calls per note. It is covered by mocked-LLM unit tests only; it has not been measured on the eval sets yet, so there are no accuracy claims for it.
+
+**Fail-safe paid runs.** `eval/safe_runner.py` checkpoints every call to JSONL and resumes from it, stops cleanly on 402 / insufficient balance / quota, retries a plain 429 once, and enforces hard caps (2,000 calls, 400/day, ₹100) plus a balance buffer checked via AICredits `GET /api/credits`. Tested with mocks only.
+
+**Eval v2 (in progress).** `eval/eval_v2.py` compares the old path and the agent in one session (same 30 notes, 3 runs each, exact match + per-field LLM judge, cost/latency, held-out attacks). Results will be added here from `eval/report_v2.py` once the run finishes.
+
 ## 📊 Evaluation Metrics
 **How to read 60.0%:** this is a human-in-the-loop draft, not autopilot. The rep reviews and edits the fields before saving.
 Per field (exact match, 30 notes): 相手 100% (30/30), 会社名 96.7% (29/30) and 期限 80.0% (24/30) are reliable;
@@ -163,6 +180,21 @@ The one miss: note 4 has no next action (「今回は情報交換のみ」), but
 | LLM judge | 60 (8 failed) | 31,487 (29,826 + 1,661) | ≈ ₹1.21 | 13.08 s per call |
 
 Total for the run: ≈ ₹2.03. *The cost estimate uses the upstream rate of $0.36/M input and $0.40/M output tokens, plus the AICredits 5% forex buffer and 5% platform fee, at USD/INR 96.06. Failed calls report no tokens. The exact amount charged is shown in the AICredits dashboard.* Latency was higher than in iteration 4 (4.6 s per note), possibly related to the upstream load that also caused the 429 errors; this was not investigated.
+
+### Eval v2 (2026-10-27): LangGraph agent path vs single-call path
+
+Tested the optional LangGraph agent (extract → validate → repair) against the single-call path in the same session: qwen-2.5-72b-instruct, temperature 0, 30 gold notes, 3 runs per path, 1,320 recorded API calls, estimated ₹29.14. **Finding: no gain over the single-call path on this data.** The repair loop never fired (89/89 agent extractions were valid on the first try). Full tables: [`eval/results_v2.md`](eval/results_v2.md).
+
+| Metric (mean of 3 runs) | Single-call path | LangGraph agent |
+| :--- | :--- | :--- |
+| Exact match, overall (150 fields) | 59.8% | 58.4% |
+| Judge score, 次アクション | 0.889 | 0.899 |
+| Judge score, リスク | 0.739 | 0.730 |
+| Held-out attacks (20), success with defenses off → on | 30% → 8.3% | 30% → 10% |
+| Repairs needed | – | 0 of 89 |
+| ₹ per note (estimated) | 0.0224 | 0.0221 |
+
+Limits: 30 synthetic notes (one note = 3.3 points) and 20 attacks (one attack = 5 points), so the differences above are within noise; the judge is the same model as the extractor (a manual check of 20 random judge grades on 2026-10-30 agreed with the judge on all 20, for both verdict and supported; small sample, see [`eval/spotcheck_v2.md`](eval/spotcheck_v2.md)); 3 runs at temperature 0 measure provider non-determinism only; ₹ is estimated from tokens × the published price, not the invoice.
 
 ### Failure analysis
 
