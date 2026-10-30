@@ -3,6 +3,8 @@
 Keep the prompt text unchanged unless you plan to re-run the eval, so results stay comparable.
 """
 
+import os
+
 MODEL_NAME = "qwen/qwen-2.5-72b-instruct"
 API_BASE_URL = "https://api.aicredits.in/v1"
 TEMPERATURE = 0
@@ -10,11 +12,9 @@ TEMPERATURE = 0
 # Slow-model fallback (app single-call path). The primary model above is the one the README numbers
 # were measured on. If the primary gives no answer within PRIMARY_TIMEOUT_S seconds, the call is
 # retried once on FALLBACK_MODEL through the same gateway. Set FALLBACK_MODEL to "" to turn it off.
-import os as _os
-
-FALLBACK_MODEL = _os.getenv("FALLBACK_MODEL", "qwen/qwen3-235b-a22b-2507")
-PRIMARY_TIMEOUT_S = float(_os.getenv("PRIMARY_TIMEOUT_S", "25"))
-FALLBACK_TIMEOUT_S = float(_os.getenv("FALLBACK_TIMEOUT_S", "60"))
+FALLBACK_MODEL = os.getenv("FALLBACK_MODEL", "qwen/qwen3-235b-a22b-2507")
+PRIMARY_TIMEOUT_S = float(os.getenv("PRIMARY_TIMEOUT_S", "25"))
+FALLBACK_TIMEOUT_S = float(os.getenv("FALLBACK_TIMEOUT_S", "60"))
 
 # Value used when a field is truly absent from the note (prompt rule 6; the app and eval use the same string)
 NOT_FOUND = "未検出"

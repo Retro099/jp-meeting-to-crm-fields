@@ -8,8 +8,7 @@ import time
 
 import openai
 
-from . import security
-from . import prompts
+from . import prompts, security
 from .prompts import CRM_FIELDS, MODEL_NAME, NOT_FOUND, SYSTEM_PROMPT, TEMPERATURE
 
 
