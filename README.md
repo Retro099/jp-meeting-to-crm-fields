@@ -4,45 +4,93 @@
 
 **English** | [日本語](README.ja.md)
 
-**TL;DR**
-- **Problem:** sales reps re-type messy Japanese meeting notes into the CRM by hand.
-- **Approach:** an LLM (Qwen 2.5 72B) extracts 5 CRM fields as JSON, with a frozen exact-match eval and optional prompt-injection defenses.
-- **Result:** 60.0% exact match (90/150) as a draft for a human to review (company 96.7%, contact 100%); attacks that succeed drop 45% → 6.7% with defenses on (self-authored 40-attack set, 3 runs), 30% → 10% on a 20-case held-out set (1 run).
+Turns Japanese meeting notes into five CRM fields (相手・会社名・期限・次アクション・リスク), for sales and account teams in Japanese companies.
 
-> Small synthetic data: evaluated on 30 LLM-generated notes (no real customer data), so treat the numbers as indicative, not production accuracy.
+**Status:** Finished. Stable on `main`. CI green.
 
-| Metric (synthetic data) | Result | Caveat |
+**▶ Live app: https://retro-jp-meeting-to-crm-fields.streamlit.app/**<br>
+*It sleeps when unused. Click the wake-up button and wait. A run can take from a few seconds to about a minute when the model provider is busy.*
+
+![Security check: defenses off vs on](docs/demo.gif)
+
+*Same Japanese note with a hidden instruction: with defenses off, the company name is hijacked; with defenses on, the instruction is flagged and ignored.*
+
+<!-- TODO image: new English GIF showing the "up to a minute" line and the "answered by" model caption -->
+
+## Results (measured)
+
+All numbers use synthetic notes (no real customer data), model Qwen 2.5 72B, temperature 0.
+
+| Metric | Result | Test |
 | :--- | :--- | :--- |
-| Exact match, 150 fields | **60.0%** (90/150) | 30 synthetic notes, 1 run (3-run mean with defenses on: 60.9%) |
-| Attack success, defenses off → on | **45% → 6.7%** | self-authored 40-attack set; off = 1 run, on = mean of 3 runs |
-| Held-out attacks, defenses off → on | **30% → 10%** (6/20 → 2/20) | 20 unseen attacks, 1 run per mode |
+| Exact match, single-call path | **59.8%** | 30 notes × 5 fields = 150 fields, mean of 3 runs (eval v2, 2026-10-27) |
+| Exact match, LangGraph agent path | 58.4% | same 150 fields, mean of 3 runs |
+| Judge score 次アクション (single / agent) | 0.889 / 0.899 | LLM judge, 30 notes, mean of 3 runs |
+| Judge score リスク (single / agent) | 0.739 / 0.730 | LLM judge, 30 notes, mean of 3 runs |
+| Held-out attacks succeeding, defenses off → on (single) | **30% → 8.3%** | 20 held-out attacks, mean of 3 runs |
+| Held-out attacks succeeding, defenses off → on (agent) | 30% → 10% | 20 held-out attacks, mean of 3 runs |
+| Repairs needed by the agent | 0 of 89 | agent extractions in eval v2 |
+| Hand check of the judge | 20 of 20 agreed | 20 random judge grades, checked by hand on 2026-10-30 |
+| Cost per note (estimated) | about ₹0.022 | tokens × published price, eval v2 |
+| Backup model exact match | 60.0% | 150 fields, **1 run** only (not a 3-run mean) |
 
-日本語の商談メモからCRM項目（相手・会社名・期限・次アクション・リスク）をLLMで抽出し、正解データで精度を評価するプロジェクトです。
+## Before / After
 
-**▶ Live demo: https://retro-jp-meeting-to-crm-fields.streamlit.app/**<br>
-*It may be asleep if no one has used it recently. Click the wake-up button and wait a moment. Demo limits apply (see below).*
+| | First version | Now |
+| :--- | :--- | :--- |
+| Extraction | single model call | same single call (default), plus an optional LangGraph extract → validate → repair path, off by default |
+| Evaluation | exact match on 30 notes | eval v2: 3 runs, temperature 0, per-field LLM judge, hand check of 20 judge grades |
+| Security | — | optional defenses, security panel, 20 held-out attack test |
+| Reliability | — | CI on every push; if the main model gives no answer in 25 s, one retry on a backup model |
 
-![Security demo: defenses off vs on](docs/demo.gif)
+The agent path was **tested, with no gain** on this data: 58.4% vs 59.8%, and the repair step was never needed (0 of 89). It stays off by default.
 
-*Same Japanese note with a hidden injected instruction: with defenses off, the company name is hijacked; with defenses on, the injection is flagged and ignored, and the correct company is extracted.*
+## How a company could use it
 
-LLM extraction of CRM fields from unstructured Japanese business meeting notes, with a fixed 30-note exact-match evaluation. The prompt is designed for common patterns in Japanese business notes—corporate abbreviations, honorifics, and informal formatting—and uses Qwen 2.5 72B Instruct to return the fields as JSON.
+1. A sales rep writes or pastes the meeting note.
+2. The model fills the five CRM fields.
+3. The rep checks and edits the fields on screen.
+4. The rep copies or downloads the JSON and saves it into the CRM.
 
-The project includes a Streamlit frontend (runnable in Docker) that shows the extracted fields, request latency, and token usage for each run.
+A person should review every result, because exact match is about 60%. 相手 and 会社名 are almost always right; 次アクション and リスク often have the right meaning in different words. Time saved has not been measured.
 
-## 🎯 Why / Who it's for
-Sales reps write quick, messy notes after a customer call, and then have to re-type the key facts into the CRM by hand. With this tool, a rep pastes the Japanese meeting note, gets the five CRM fields (相手・会社名・期限・次アクション・リスク) back as JSON, reviews and corrects them, and then saves them to the CRM. The aim is to cut manual CRM data entry; the time saved has not been measured.
+## What it does not do / limits
 
-**Demo limits:** to protect the API budget, the hosted demo allows at most 2,000 characters per note, 5 runs per visitor session, and a shared daily cap on total runs.
+- It does not write into a CRM by itself.
+- Tested on 30 synthetic notes only; one note moves the score by 3.3 points.
+- Model speed depends on the provider. A run can take from a few seconds to about a minute when the provider is busy.
+- Accuracy numbers belong to the main model. The backup model has one run only.
+- The judge is the same model as the extractor.
+- Pasted text goes to the API provider (AICredits) and the model host. Do not paste confidential or personal data.
+- App limits: 2,000 characters per note, 5 runs per session, a shared daily cap.
 
-**Privacy:** text you paste is sent to the API provider (AICredits) and the upstream model host, so don't paste confidential or personal data. The app shows the same note next to the input box.
+## Security test
 
-## 🏗️ Architecture & Tech Stack
-* **LLM Engine:** Qwen 2.5 72B Instruct
-* **API Gateway:** AICredits (OpenAI SDK compatible, enabling cost-effective and region-unlocked model access)
-* **Frontend UI:** Streamlit with a Japanese/English toggle (Japanese by default). The five fields are shown as editable inputs (`未検出` when the note has no value), and the edited values can be copied or downloaded as JSON. Latency, token usage, and the raw model JSON are shown too.
-* **Deployment:** Docker (`python:3.11-slim`) for local runs; Streamlit Community Cloud for the hosted demo.
-* **Evaluation:** Custom Python evaluation loop for exact-match validation against a gold-standard dataset.
+A note can hide instructions (prompt injection, OWASP LLM01:2025). With defenses on, the app marks the note as data, checks the output, and shows a security panel with what was blocked or flagged. On 20 held-out attacks (mean of 3 runs), attacks that got through fell from 30% to 8.3% (single-call). An earlier test on a self-written set of 40 attacks gave 45% → 6.7% (3 runs with defenses on); that set was used to build the defenses, so it is not the main figure. Details below and in [`SECURITY.md`](SECURITY.md).
+
+## How to run
+
+```bash
+git clone https://github.com/Retro099/jp-meeting-to-crm-fields.git
+cd jp-meeting-to-crm-fields
+pip install -r requirements.txt
+# put AICREDITS_API_KEY=... in .env
+streamlit run app.py
+```
+
+Tests (no API key): `pip install -r requirements-dev.txt && pytest -q`. Docker steps are in [Quick Start](#-quick-start-local-deployment).
+
+## Tech stack
+
+- Model: Qwen 2.5 72B Instruct; backup `qwen/qwen3-235b-a22b-2507`, via AICredits (OpenAI-compatible API)
+- Optional agent: LangGraph
+- UI: Streamlit, Japanese/English toggle, editable fields, JSON download
+- Deploy: Docker (`python:3.11-slim`), Streamlit Community Cloud
+- Eval and CI: Python eval scripts, pytest, ruff, GitHub Actions
+
+---
+
+# Details
 
 ## 🧠 Japanese NLP & Prompt Engineering
 Extracting data from Japanese business notes requires handling specific linguistic edge cases. The prompt architecture was iteratively engineered to enforce:
@@ -87,7 +135,7 @@ spoofing) got through in all 3 defended runs, A031 in 2 of 3.
 
 **Held-out check (unseen attacks):** 20 new attacks written without looking at the scan's patterns (`data/attacks_v2_heldout.jsonl`,
 one run per mode, 2026-10-12): 6/20 (30%) got through with defenses off, **2/20 (10%)** with defenses on (H004: instruction
-hidden with zero-width characters; H019: a shell command written into the note as the next step). Small set, single run. Details: [`SECURITY.md`](SECURITY.md),
+hidden with zero-width characters; H019: a shell command written into the note as the next step). 20 attacks, single run (later 3-run figure: 30% → 8.3%, see Eval v2). Details: [`SECURITY.md`](SECURITY.md),
 [`eval/security_results.md`](eval/security_results.md), and a side-by-side demo in [`docs/SECURITY_DEMO.md`](docs/SECURITY_DEMO.md).
 
 ### How to test it yourself
@@ -102,14 +150,14 @@ hidden with zero-width characters; H019: a shell command written into the note a
 
 Off by default. The default app and eval still use the single-call `extract_crm_data`.
 
-`crm_extractor/agent.py` runs a small LangGraph graph: **extract → validate → repair (at most 2 retries) → done**. Validation reuses the existing JSON parsing and `security.validate_schema` (all 5 keys present, text-only, single-line, length limit). On failure the model is re-prompted (up to twice) with the list of errors; if it still fails, the result comes back with `agent.valid = False` and the errors listed, instead of retrying forever.
+`crm_extractor/agent.py` runs a LangGraph graph: **extract → validate → repair (at most 2 retries) → done**. Validation reuses the existing JSON parsing and `security.validate_schema` (all 5 keys present, text-only, single-line, length limit). On failure the model is re-prompted (up to twice) with the list of errors; if it still fails, the result comes back with `agent.valid = False` and the errors listed, instead of retrying forever.
 
 ```python
 from crm_extractor.agent import extract_crm_data_agent
 result = extract_crm_data_agent(client, note, defenses=True)  # same shape as extract_crm_data + result["agent"]
 ```
 
-In the app, turn on **🧪 LangGraph agent (experimental)** in the sidebar. It uses up to 3 API calls per note. It is covered by mocked-LLM unit tests only; it has not been measured on the eval sets yet, so there are no accuracy claims for it.
+In the app, turn on **🧪 LangGraph agent (experimental)** in the sidebar. It uses up to 3 API calls per note. It was measured in eval v2 below: no gain over the single-call path on this data.
 
 **Fail-safe paid runs.** `eval/safe_runner.py` checkpoints every call to JSONL and resumes from it, stops cleanly on 402 / insufficient balance / quota, retries a plain 429 once, and enforces hard caps (2,000 calls, 400/day, ₹100) plus a balance buffer checked via AICredits `GET /api/credits`. Tested with mocks only.
 
@@ -169,7 +217,7 @@ Per-field results (iteration 5, temperature=0):
 | Present fields wrongly output as `未検出` | 0/18 |
 | Exact match, all fields | 18/25 |
 
-The one miss: note 4 has no next action (「今回は情報交換のみ」), but the model output `情報交換` instead of `未検出`. The set is very small, so treat it as a sanity check, not an accuracy figure.
+The one miss: note 4 has no next action (「今回は情報交換のみ」), but the model output `情報交換` instead of `未検出`. With only 5 notes, treat it as a sanity check, not an accuracy figure.
 
 **Cost and latency (measured in this run):**
 
@@ -194,7 +242,7 @@ Tested the optional LangGraph agent (extract → validate → repair) against th
 | Repairs needed | – | 0 of 89 |
 | ₹ per note (estimated) | 0.0224 | 0.0221 |
 
-Limits: 30 synthetic notes (one note = 3.3 points) and 20 attacks (one attack = 5 points), so the differences above are within noise; the judge is the same model as the extractor (a manual check of 20 random judge grades on 2026-10-30 agreed with the judge on all 20, for both verdict and supported; small sample, see [`eval/spotcheck_v2.md`](eval/spotcheck_v2.md)); 3 runs at temperature 0 measure provider non-determinism only; ₹ is estimated from tokens × the published price, not the invoice.
+Limits: 30 synthetic notes (one note = 3.3 points) and 20 attacks (one attack = 5 points), so the differences above are within noise; the judge is the same model as the extractor (a manual check of 20 random judge grades on 2026-10-30 agreed with the judge on all 20, for both verdict and supported; 20-item sample, see [`eval/spotcheck_v2.md`](eval/spotcheck_v2.md)); 3 runs at temperature 0 measure provider non-determinism only; ₹ is estimated from tokens × the published price, not the invoice.
 
 ### Backup model when the main model is slow (2026-10-30)
 
@@ -291,8 +339,8 @@ Community Cloud installs the pinned packages from `requirements.txt`. Apps with 
 - Done: semantic (LLM-as-judge) scoring for `次アクション` and `リスク`; measured cost and latency per note; unit tests and CI.
 - The judge is the same model family as the extractor and was lenient in the spot-check. A different judge model, or a review by a Japanese-speaking domain expert, would make the semantic scores more reliable.
 - Prompt fixes suggested by the failure analysis: keep `中` in deadlines (`明日中`, `午前中`), list every risk, keep the legal-entity position, and expand `(同)`. Iteration 5 only added the `未検出` rule; these fixes are not done yet.
-- The eval set is small (30 synthetic notes), so a few notes change the score by several points.
-- Security: A001 and A032 still get through with defenses on (plausible-looking values that the attacker wrote into the note); the attack set is small (40) and the note-scan patterns were written against it. See [`SECURITY.md`](SECURITY.md).
+- The eval set has 30 synthetic notes, so a few notes change the score by several points.
+- Security: A001 and A032 still get through with defenses on (plausible-looking values that the attacker wrote into the note); the attack set has 40 cases and the note-scan patterns were written against it. See [`SECURITY.md`](SECURITY.md).
 - Done: editable fields in the UI with JSON copy/download, `未検出` for missing fields, and a Japanese/English UI toggle.
 
 ## 📂 Repository Structure
