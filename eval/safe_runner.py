@@ -102,6 +102,12 @@ def run_batch(items, call, checkpoint, max_calls=DEFAULT_MAX_CALLS, per_day=DEFA
                 break
             except Exception as e:
                 kind = classify_error(e)
+                try:  # keep the exact error (never the key) so a stop can be diagnosed
+                    _msg = (str(getattr(e, "status_code", "")) + " " + type(e).__name__ + " " + str(getattr(e, "body", "") or e))[:600]
+                    with open(os.path.join(os.path.dirname(checkpoint) or ".", "errors.log"), "a", encoding="utf-8") as ef:
+                        ef.write(f"{key}\tkind={kind}\t{_msg}\n")
+                except Exception:
+                    pass
                 if kind == "billing":
                     raise StopRun(EXIT_BILLING, "Billing/quota error from the API (402 or insufficient balance). Stopping, no retry.") from None
                 if kind == "rate" and attempts == 1:
