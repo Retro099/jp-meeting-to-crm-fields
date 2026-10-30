@@ -41,7 +41,7 @@ All numbers use synthetic notes (no real customer data), model Qwen 2.5 72B, tem
 | Extraction | single model call | same single call (default), plus an optional LangGraph extract → validate → repair path, off by default |
 | Evaluation | exact match on 30 notes | eval v2: 3 runs, temperature 0, per-field LLM judge, hand check of 20 judge grades |
 | Security | — | optional defenses, security panel, 20 held-out attack test |
-| Reliability | — | CI on every push; if the main model gives no answer in 25 s, one retry on a backup model |
+| Reliability | CI on every push | CI on every push; if the main model gives no answer in 25 s, one retry on a backup model |
 
 The agent path was **tested, with no gain** on this data: 58.4% vs 59.8%, and the repair step was never needed (0 of 89). It stays off by default.
 
