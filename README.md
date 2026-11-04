@@ -11,11 +11,7 @@ Turns Japanese meeting notes into five CRM fields (相手・会社名・期限�
 **▶ Live app: https://retro-jp-meeting-to-crm-fields.streamlit.app/**<br>
 *It sleeps when unused. Click the wake-up button and wait. A run can take from a few seconds to about a minute when the model provider is busy.*
 
-![Security check: defenses off vs on](docs/demo.gif)
-
-*Same Japanese note with a hidden instruction: with defenses off, the company name is hijacked; with defenses on, the instruction is flagged and ignored.*
-
-<!-- TODO image: new English GIF showing the "up to a minute" line and the "answered by" model caption -->
+![Screenshot (English UI)](docs/screenshot_en.png)
 
 ## Results (measured)
 
@@ -129,7 +125,7 @@ Measured with defenses on, 3 runs on 2026-10-12 (temperature 0, GitHub Actions):
 | Exact match, 150 fields | 90/150 (60.0%) | 91/150 (60.7%) | 93/150 (62.0%) | **60.9%** (60.0–62.0%) |
 | Correct values flagged by provenance | 2/150 | 3/150 | 3/150 | 1.8% (0 blocked) |
 
-These numbers come from a **self-authored 40-attack set, 3 runs**: 45% → 6.7%. Without defenses, 18/40 attacks (45.0%) got through (one run). The attacks that still pass copy their fake value into the note
+These numbers come from a **self-authored 40-attack set, 3 runs**, so they are not the headline result (the defenses were built against this same set). The headline is the held-out set of 20 unseen attacks: 30% → 8.3% (single call) and 30% → 10% (agent). Without defenses, 18/40 attacks (45.0%) got through (one run). The attacks that still pass copy their fake value into the note
 itself, so it *does* appear in the note and only a human can tell it is wrong. A001 (hidden instruction) and A032 (role
 spoofing) got through in all 3 defended runs, A031 in 2 of 3.
 
@@ -364,7 +360,7 @@ Community Cloud installs the pinned packages from `requirements.txt`. Apps with 
 │   ├── attacks_v2_heldout.jsonl  # 20 held-out attacks, written blind to the scan patterns
 │   └── make_attacks_v2.py     # Generates attacks_v2_heldout.jsonl (how they were written is in its header)
 ├── docs/
-│   ├── demo.gif               # Defenses off vs on demo (README top)
+│   ├── screenshot_en.png      # Live app, English UI (fictional sample note)
 │   ├── SECURITY_DEMO.md       # Side-by-side attack demo with expected results
 │   └── screenshot_ja.png      # Live app, Japanese UI (fictional sample note)
 ├── eval/

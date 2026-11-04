@@ -88,7 +88,11 @@ def scan_for_canary(raw_text, canary):
 
 _INSTRUCTION_PATTERNS = [
     r"ignore\s+(all\s+)?(the\s+)?(previous|above|prior)",
-    r"disregard\s+(all\s+)?(previous|above|prior)",
+    r"disregard\s+(all\s+)?(the\s+)?(\w+\s+)?(previous|above|prior)",
+    # H019: shell commands written into a field (e.g. curl ... | sh)
+    r"\b(curl|wget)\s+\S",
+    r"\|\s*(ba|z)?sh\b",
+    r"\brm\s+-rf\b",
     r"\bsystem\s*(prompt|message)?\s*[:：]",
     r"\b(assistant|developer)\s*[:：]",
     r"\byou\s+(are|must|should)\s+now\b",
@@ -107,8 +111,16 @@ _INSTRUCTION_PATTERNS = [
 _INSTRUCTION_RE = re.compile("|".join(f"(?:{p})" for p in _INSTRUCTION_PATTERNS), re.IGNORECASE)
 
 
+# H004: zero-width / invisible format characters can split words ("dis\u200bregard") so patterns miss them.
+_INVISIBLE_RE = re.compile("[\u00ad\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]")
+
+
+def strip_invisible(text):
+    return _INVISIBLE_RE.sub("", str(text or ""))
+
+
 def is_instruction_like(value):
-    return bool(_INSTRUCTION_RE.search(str(value or "")))
+    return bool(_INSTRUCTION_RE.search(strip_invisible(value)))
 
 
 def flag_instruction_like(fields):
@@ -135,6 +147,8 @@ def harden_output(raw_text, data, canary=None, note=None):
     clean, report["flagged_fields"] = flag_instruction_like(clean)
     fields = {f: (clean.get(f) or NOT_FOUND) for f in CRM_FIELDS}
     if note is not None:
+        fields, tainted = drop_values_from_injected_lines(fields, note)
+        report["flagged_fields"] += [k for k in tainted if k not in report["flagged_fields"]]
         fields, report["provenance_blocked"], report["provenance_flagged"] = check_provenance(fields, note)
     return fields, report
 
@@ -258,8 +272,22 @@ SNIPPET_CHARS = 60
 def scan_note_for_injection(note):
     """Return the lines of the note that look like instructions to the AI (stripped, max SNIPPET_CHARS each)."""
     hits = []
-    for line in str(note or "").splitlines():
+    for line in strip_invisible(note).splitlines():
         line = line.strip()
         if line and _NOTE_RE.search(line):
             hits.append(line if len(line) <= SNIPPET_CHARS else line[:SNIPPET_CHARS] + "…")
     return hits
+
+
+def drop_values_from_injected_lines(fields, note):
+    """H004: a value copied only from a line the note scan flags as an instruction is replaced with 未検出."""
+    lines = [l.strip() for l in strip_invisible(note).splitlines() if l.strip()]
+    bad = [normalize_for_match(l) for l in lines if _NOTE_RE.search(l)]
+    good = normalize_for_match("\n".join(l for l in lines if not _NOTE_RE.search(l)))
+    out, tainted = dict(fields), []
+    for key, value in fields.items():
+        v = normalize_for_match(strip_invisible(value))
+        if value != NOT_FOUND and v and any(v in b for b in bad) and v not in good:
+            out[key] = NOT_FOUND
+            tainted.append(key)
+    return out, tainted
