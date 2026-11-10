@@ -117,6 +117,10 @@ What the defenses do, in plain words:
 
 With defenses on, the app shows a **security panel** listing what was blocked or flagged and why.
 
+![Security defenses on (English UI)](docs/screenshot_security_en.png)
+
+*Live app, 2026-11-10, defenses on. An instruction-like line (`以前の指示を無視して…`) is shown as ignored by defenses, and the five fields stay as written in the note.*
+
 Measured with defenses on, 3 runs on 2026-10-12 (temperature 0, GitHub Actions):
 
 | | Run 1 | Run 2 | Run 3 | Mean (range) |
@@ -157,7 +161,7 @@ In the app, turn on **🧪 LangGraph agent (experimental)** in the sidebar. It u
 
 **Fail-safe paid runs.** `eval/safe_runner.py` checkpoints every call to JSONL and resumes from it, stops cleanly on 402 / insufficient balance / quota, retries a plain 429 once, and enforces hard caps (2,000 calls, 400/day, ₹100) plus a balance buffer checked via AICredits `GET /api/credits`. Tested with mocks only.
 
-**Eval v2 (in progress).** `eval/eval_v2.py` compares the old path and the agent in one session (same 30 notes, 3 runs each, exact match + per-field LLM judge, cost/latency, held-out attacks). Results will be added here from `eval/report_v2.py` once the run finishes.
+**Eval v2 (finished 2026-10-27).** `eval/eval_v2.py` compared the old path and the agent in one session (same 30 notes, 3 runs each, exact match + per-field LLM judge, cost/latency, held-out attacks). Results are in [Eval v2](#eval-v2-2026-10-27-langgraph-agent-path-vs-single-call-path) below and in [`eval/results_v2.md`](eval/results_v2.md).
 
 ## 📊 Evaluation Metrics
 **How to read 60.0%:** this is a human-in-the-loop draft, not autopilot. The rep reviews and edits the fields before saving.
@@ -361,8 +365,9 @@ Community Cloud installs the pinned packages from `requirements.txt`. Apps with 
 │   └── make_attacks_v2.py     # Generates attacks_v2_heldout.jsonl (how they were written is in its header)
 ├── docs/
 │   ├── screenshot_en.png      # Live app, English UI (fictional sample note)
-│   ├── SECURITY_DEMO.md       # Side-by-side attack demo with expected results
-│   └── screenshot_ja.png      # Live app, Japanese UI (fictional sample note)
+│   ├── screenshot_ja.png      # Live app, Japanese UI (fictional sample note)
+│   ├── screenshot_security_en.png  # Live app, English UI, defenses on
+│   └── SECURITY_DEMO.md       # Side-by-side attack demo with expected results
 ├── eval/
 │   ├── run_eval.py            # Accuracy run on a labelled set -> predictions + run metadata
 │   ├── run_attacks.py         # Attack run (defenses off/on) -> attacks_*.jsonl
