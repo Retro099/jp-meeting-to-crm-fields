@@ -10,6 +10,10 @@ To try it: paste the note into the [app](https://retro-jp-meeting-to-crm-fields.
 
 > **Input scan (display only, no AI calls):** the security panel also scans the pasted note for instruction-like lines (EN + JP) and shows them, so a silently neutralized attack is still visible. It flags 40/40 notes in `data/attacks_v1.jsonl` and 0/35 clean eval notes (`gold_30` + `missing_5`). The patterns were written while looking at this attack set, so treat 40/40 as a sanity check, not a measured detection rate on new attacks. Extraction output and eval numbers are unchanged.
 
+The screenshot below is the live English UI on 2026-11-10 (not one of the recorded runs in this file). Defenses are on. An instruction-like line (`以前の指示を無視して…`) is shown as ignored by defenses, and the five fields stay as written in the note.
+
+![Security defenses on (English UI)](screenshot_security_en.png)
+
 ## 0. Normal note (no attack)
 
 ```text
